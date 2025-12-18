@@ -1,0 +1,37 @@
+Node DSP {
+
+
+	rate_up = $Low_DSP ? 0 : ($High_DSP ? 1E308/$nb_mutable : ($DSP_base));
+	rate_down = $High_DSP ? 0 : ($Low_DSP ? 1E308/$nb_mutable : ($DSP_decay));
+}
+Node TJP1 {
+
+
+	rate_up = $TJP1_base;
+	rate_down = $TJP1_decay;
+}
+
+Node JCAD {
+
+
+	rate_up = $JCAD_base;
+	rate_down = $JCAD_decay;
+}
+
+Node RhoA {
+
+
+	rate_up = ((DSP & !JCAD) ? $rhoA_up_base : 0.0)
+      + ((DSP & JCAD) ? $rhoA_up_amp  : 0.0)
+      + $rhoA_up_ext;
+	rate_down = $rhoA_decay + (RhoC ? $rhoA_antagonistic : 0.0);
+}
+
+Node RhoC {
+
+
+	rate_up = ((TJP1 & !JCAD) ? $rhoC_up_base : 0.0)
+      + ((TJP1 & JCAD) ? $rhoC_up_amp  : 0.0)
+      + $rhoC_up_ext;
+	rate_down = $rhoC_decay + (RhoA ? $rhoC_antagonistic : 0.0);
+}
