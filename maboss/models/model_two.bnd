@@ -9,12 +9,12 @@ node DSP {
 }
 
 node TJP1 {
-    rate_up = 0;
+    rate_up = 0.0;
     rate_down = 0.0;
 }
 
 node JCAD {
-    rate_up = 0;
+    rate_up = 0.0;
     rate_down = 0.0;
 }
 
@@ -24,16 +24,16 @@ node JCAD {
 node RhoA {
     // 1. JCAD Amp, 2. Basal DSP 3. External Rescue
 
-    rate_up = (DSP & JCAD) ? $R_amp_A : 
-              (DSP ? $R_mod_A : 
-              $R_basal_A);
-    rate_down = RhoC ? $R_antagonistic_A : $R_decay_A;
+    rate_up = (DSP & JCAD) ? $RhoA_amp : 
+              (DSP ? $RhoA_mod : 
+              $RhoA_basal);
+    rate_down = RhoC ? $RhoA_antagonistic : $RhoA_decay;
 }
 
 node RhoC {
-    rate_up = (TJP1 & JCAD) ? $R_amp_C : 
-              (TJP1 ? $R_mod_C : 
-              $R_basal_C);
-    rate_down = RhoA ? $R_antagonistic_C : $R_decay_C;
+    rate_up = (TJP1 & JCAD) ? $RhoC_amp : 
+              (TJP1 ? $RhoC_mod : 
+              $RhoC_basal);
+    rate_down = RhoA ? $RhoC_antagonistic : $RhoC_decay;
 }
 
