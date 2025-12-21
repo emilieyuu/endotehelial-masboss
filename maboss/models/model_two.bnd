@@ -1,0 +1,39 @@
+// model_two.bnd
+// Descriptor file for network model 2
+
+// --- Input Nodes (Y): Env. Controls ---
+// change: now fixed external conditions
+node DSP {
+    rate_up = 0.0; 
+    rate_down = 0.0; 
+}
+
+node TJP1 {
+    rate_up = 0;
+    rate_down = 0.0;
+}
+
+node JCAD {
+    rate_up = 0;
+    rate_down = 0.0;
+}
+
+
+// --- Inner Components (X): Molecular Switches ---
+// Key change: prioritrisation over amplification
+node RhoA {
+    // 1. JCAD Amp, 2. Basal DSP 3. External Rescue
+
+    rate_up = (DSP & JCAD) ? $R_amp_A : 
+              (DSP ? $R_mod_A : 
+              $R_basal_A);
+    rate_down = RhoC ? $R_antagonistic_A : $R_decay_A;
+}
+
+node RhoC {
+    rate_up = (TJP1 & JCAD) ? $R_amp_C : 
+              (TJP1 ? $R_mod_C : 
+              $R_basal_C);
+    rate_down = RhoA ? $R_antagonistic_C : $R_decay_C;
+}
+
