@@ -1,0 +1,9 @@
+KO,Phenotype
+WT,Normal
+DSP,Hyper
+TJP1,Failed
+JCAD,Normal
+DSP_TJP1,Normal
+DSP_JCAD,Normal
+TJP1_JCAD,Normal
+DSP_TJP1_JCAD,Normal
