@@ -18,7 +18,7 @@ def generate_ko_models(base_model, nodes):
     # Add all possible knockout combinations for procided nodes to perturbation list. 
     for r in range(1, len(nodes) + 1):
         for combo in combinations(nodes, r):
-            name = "_".join(combo) + "_ko"
+            name = "_".join(combo) #+ "_ko"
 
             #print(f"name: {name} for combo {combo}")
             m = base_model.copy()
