@@ -1,12 +1,15 @@
 name: endothelial-maboss
 channels:
+  - conda-forge
   - defaults
 dependencies:
-  - python=3.11
-  - pymaboss
+  - python=3.9
   - ipython
   - jupyter
   - pandas
   - matplotlib
   - numpy
-prefix: /opt/miniconda3/envs/endothelial-maboss
+  - pip
+  - pip:
+      - pymaboss
+
