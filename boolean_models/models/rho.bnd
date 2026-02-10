@@ -1,0 +1,34 @@
+// rho.bnd
+// Rho-Junction model
+
+// --- Input Nodes (Y): Env. Controls ---
+node DSP {
+    rate_up = 0.0; 
+    rate_down = 0.0; 
+}
+
+node TJP1 {
+    rate_up = 0.0;
+    rate_down = 0.0;
+}
+
+node JCAD {
+    rate_up = 0.0;
+    rate_down = 0.0;
+}
+
+
+// --- Inner Components (X): Molecular Switches ---
+node RhoA {
+    rate_up = (DSP & JCAD) ? $RhoA_amp : 
+              (DSP ? $RhoA_mod : 
+              $RhoA_basal);
+    rate_down = RhoC ? $RhoA_antagonistic : $RhoA_decay;
+}
+
+node RhoC {
+    rate_up = (TJP1 & JCAD) ? $RhoC_amp : 
+              (TJP1 ? $RhoC_mod : 
+              $RhoC_basal);
+    rate_down = RhoA ? $RhoC_antagonistic : $RhoC_decay;
+}
