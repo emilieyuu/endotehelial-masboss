@@ -18,13 +18,11 @@ def generate_ko_models(base_model, nodes):
     # Add all possible single and double knockout combinations. 
     for r in [1, 2]:
         for combo in combinations(nodes, r):
-            name = "_".join(combo) #+ "_ko"
-
-            #print(f"name: {name} for combo {combo}")
+            name = "_".join(combo) 
+            
+            # Simulate knockout
             m = base_model.copy()
-
             for node in combo:
-                # Simulate knockout
                 m.mutate(node, "OFF") 
                 m.update_parameters(**{f"${node}_base": 0.0})
 
