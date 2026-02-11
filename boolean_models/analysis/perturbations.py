@@ -15,8 +15,8 @@ def generate_ko_models(base_model, nodes):
     # Initiate perturbation dict. with WT (no knockouts).
     pertubations = {"WT": base_model}
 
-    # Add all possible knockout combinations for procided nodes to perturbation list. 
-    for r in range(1, len(nodes) + 1):
+    # Add all possible single and double knockout combinations. 
+    for r in [1, 2]:
         for combo in combinations(nodes, r):
             name = "_".join(combo) #+ "_ko"
 
@@ -31,3 +31,16 @@ def generate_ko_models(base_model, nodes):
             pertubations[name] = m
 
     return pertubations
+
+def generate_ko_names(nodes):
+    """
+    Return KO scenario names without creating models.
+    """
+    names = ["WT"]
+
+    for r in range(1, len(nodes) + 1):
+        for combo in combinations(nodes, r):
+            name = "_".join(combo) 
+            names.append(name)
+
+    return names

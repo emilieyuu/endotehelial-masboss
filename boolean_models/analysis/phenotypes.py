@@ -8,10 +8,12 @@ def compute_delta(prob_df):
 
 def classify_phenotype(prob_df, eps=0.25):
     """ Classify into discrete phenotype based on threshold. """
-    delta = compute_delta(prob_df)
+    #delta = compute_delta(prob_df)
+    delta = prob_df['delta']
+    pheno_df = pd.DataFrame({
+                    "Failed": (delta < -eps).astype(float),
+                    "Hyper": (delta > eps).astype(float),
+                    "Normal": (abs(delta) <= eps).astype(float),
+                }, index=prob_df.index)
 
-    return pd.DataFrame({
-        "Failed": (delta < -eps).astype(float),
-        "Hyper": (delta > eps).astype(float),
-        "Normal": (abs(delta) <= eps).astype(float),
-    }, index=prob_df.index)
+    return pheno_df
