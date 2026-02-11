@@ -93,7 +93,7 @@ def main():
         perb_dict[name] = balance_df
 
         # Compute raw phenotypes
-        phenotype_df = classify_phenotype(balance_df)  
+        phenotype_df = classify_phenotype(balance_df).rename_axis('t').reset_index()  
         save_df_to_csv(phenotype_df, processed_dir, f"{name}_phenotype.csv")
 
         phenotype_dict[name] = phenotype_df
