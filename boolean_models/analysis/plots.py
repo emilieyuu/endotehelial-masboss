@@ -73,3 +73,28 @@ def plot_delta(name, df, eps=0.20, save=True, outdir=None, show=False):
         
     plt.close(fig)
     return fig
+
+def plot_full_ss(df, eps=0.25, save=True, outdir=None, show=False):
+    fig, ax = plt.subplots(figsize=(6,4))
+
+    df["delta"].plot(kind="bar", ax=ax)
+
+    ax.axhline(eps, linestyle="--", label="+ε", color='red')
+    ax.axhline(-eps, linestyle="--", label="-ε", color='red')
+    ax.axhline(0, linestyle=":", color='grey')
+
+    ax.set_ylabel("Steady-state Δ")
+    ax.set_title("Steady-state Rho balance across perturbations")
+    ax.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+    if save and outdir is not None:
+        outpath = outdir / "ss_balance.png"
+        fig.savefig(outpath, dpi=300)
+
+    if show: 
+        plt.show()
+
+    plt.close(fig)

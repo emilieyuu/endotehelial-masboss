@@ -104,6 +104,11 @@ def main():
     balance_concat_df = extract_steady_state(perb_dict)
     pheno_concat_df = extract_steady_state(phenotype_dict)
 
+    pheno_df_long = pheno_concat_df.melt(id_vars="scenario", 
+                                        value_vars=["Failed", "Hyper", "Normal"], 
+                                        var_name="phenotype", 
+                                        value_name="value")
+
     save_df_to_csv(balance_concat_df, ss_dir, f"steady_state_balance.csv")
     save_df_to_csv(pheno_concat_df, ss_dir, f"steady_state_phenotype.csv")
     print("DEBUG: Processed steady state data saved sucessfully")
