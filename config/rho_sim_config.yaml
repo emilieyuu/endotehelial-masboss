@@ -1,0 +1,42 @@
+
+# Path Configuration
+# Paths are relative to the PROJECT_ROOT
+paths:
+  model_bnd: "data/models/rho.bnd"
+  model_cfg: "data/models/rho.cfg"
+  results_base: "results/boolean_models/"
+  subdirs:
+    raw: "raw"
+    processed: "processed"
+    steady_state: "steady_state"
+
+# Simulation Parameters
+simulation:
+  phenotypes:
+    - "Failed"
+    - "Hyper"
+    - "Normal"
+
+# Analysis Settings
+analysis:
+  thresholds:
+      eps: 0.25
+  nodes:
+    target_a: "RhoA"
+    target_b: "RhoC"
+
+# Perturbation Settings
+perturbations:
+  WT: {}
+  DSP: 
+    DSP: "OFF"
+  TJP1: 
+    TJP1: "OFF"
+  JCAD:
+    JCAD: "OFF"
+  DSP_JCAD: 
+    DSP: "OFF"
+    JCAD: "OFF"
+  TJP1_JCAD: 
+    TJP1: "OFF"
+    JCAD: "OFF"
