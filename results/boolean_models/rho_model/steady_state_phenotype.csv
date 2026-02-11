@@ -1,9 +1,0 @@
-t,Failed,Hyper,Normal,scenario
-39,0.0,0.0,1.0,WT
-39,0.0,1.0,0.0,DSP
-39,1.0,0.0,0.0,TJP1
-39,0.0,0.0,1.0,JCAD
-39,0.0,0.0,1.0,DSP_TJP1
-39,0.0,0.0,1.0,DSP_JCAD
-39,0.0,0.0,1.0,TJP1_JCAD
-39,0.0,0.0,1.0,DSP_TJP1_JCAD
