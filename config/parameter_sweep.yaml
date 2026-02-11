@@ -1,0 +1,24 @@
+# Metadata
+
+rate_parameters: 
+  - parameter: "$RhoA_amp"
+    range: [5.0, 50.0]
+    steps: 10.0
+    scale: "linear"
+  - parameter: "$RhoA_mod"
+    range: [1.0, 8.0]
+    steps: 2.0
+    scale: "linear"
+  - parameter: "$RhoA_basal"
+    range: [0.1, 1.5]
+    steps: 0.5
+    scale: "log"
+  - parameter: "$RhoA_antagonistic"
+    range: [1.0, 15.0]
+    steps: 2.0
+    scale: "linear"
+  - parameter: "$RhoA_decay"
+    range: [0.05, 1.0]
+    steps: 0.1
+    scale: "log"
+

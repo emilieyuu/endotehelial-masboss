@@ -50,7 +50,6 @@ def extract_steady_state(dict):
     processed_dfs = []
     for name, df in dict.items():
         tail_df = (df.tail(1).copy().assign(scenario=name))
-        print(tail_df)
         processed_dfs.append(tail_df)
 
     return pd.concat(processed_dfs, ignore_index=True)
@@ -88,7 +87,8 @@ def run_perturbation_single():
         # Run MaBoSS
         res = m.run()
         prob_df = res.get_nodes_probtraj().rename_axis('t').reset_index()
-        
+    
+
         # Compute Rho balance
         balance_df = prob_df.copy()  
         balance_df["delta"] = compute_delta(balance_df)
@@ -118,6 +118,8 @@ def run_perturbation_single():
     save_df_to_csv(pheno_concat_df, SS_DIR, f"steady_state_phenotype.csv")
 
     print("DEBUG: Processed steady state data saved sucessfully")
+    
+    return perb_dict
 
 if __name__ == "__main__":
-    run_perturbation_single()
+    perb_dict = run_perturbation_single()
