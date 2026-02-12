@@ -53,9 +53,16 @@ def extract_steady_state(dict):
         processed_dfs.append(tail_df)
 
     return pd.concat(processed_dfs, ignore_index=True)
-    
+
+def generate_model(base_model, mutation):
+        m = base_model.copy()
+
+        for node, state in mutation.items():
+            m.mutate(node, state)
+
+        return m
 # --------------------------------------------------
-# main
+# Run perturbation
 # --------------------------------------------------
 def run_perturbation_single():
     """
@@ -80,9 +87,7 @@ def run_perturbation_single():
         print(f"DEBUG: Running scenario: {name}")
 
         # Create model of KO scenario
-        m = base_model.copy()
-        for node, state in mutation.items():
-            m.mutate(node, state)
+        m = generate_model(base_model, mutation)
 
         # Run MaBoSS
         res = m.run()
@@ -112,10 +117,10 @@ def run_perturbation_single():
 
     #Temp for testing
     balance_concat_df = extract_steady_state(perb_dict)
-    save_df_to_csv(balance_concat_df, SS_DIR, f"steady_state_balance.csv")
+    save_df_to_csv(balance_concat_df, PROCESSED_DIR, f"steady_state_balance.csv")
 
     pheno_concat_df = extract_steady_state(phenotype_dict)
-    save_df_to_csv(pheno_concat_df, SS_DIR, f"steady_state_phenotype.csv")
+    save_df_to_csv(pheno_concat_df, PROCESSED_DIR, f"steady_state_phenotype.csv")
 
     print("DEBUG: Processed steady state data saved sucessfully")
     

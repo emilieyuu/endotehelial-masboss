@@ -6,6 +6,7 @@ def compute_delta(prob_df):
     """ Store balance as difference between RhoC and RhoA"""
     return prob_df["RhoC"] - prob_df["RhoA"]
 
+# Phenotype timeseries
 def classify_phenotype(prob_df, eps=0.25):
     """ Classify into discrete phenotype based on threshold. """
     #delta = compute_delta(prob_df)

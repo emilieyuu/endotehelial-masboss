@@ -11,6 +11,7 @@ paths:
     raw: "raw"
     processed: "processed"
     steady_state: "steady_state"
+    param_sweep: "param_sweep"
 
 # Simulation Parameters
 simulation:
