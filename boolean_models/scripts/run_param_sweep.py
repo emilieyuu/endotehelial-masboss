@@ -1,40 +1,38 @@
 #boolean_models/scripts/run_param_sweep.py
 import maboss
 import pandas as pd
-import matplotlib.pyplot as plt
 from pathlib import Path
-import shutil
-import sys
 import yaml
 import numpy as np
 
 from boolean_models.analysis import compute_delta
 
-HERE = Path(__file__).resolve().parent
-PROJECT_ROOT = HERE.parent.parent
-CONFIG_PATH = PROJECT_ROOT / "config" / "rho_sim_config.yaml"
-with open(CONFIG_PATH, "r") as f:
-    config = yaml.safe_load(f)
+def run_param_sweep_single(model, perturbation, config, sweep_cfg):
+    base_model = model
 
+    result = []
+    
+    for param_cfg in sweep_cfg:
+        name = param_cfg['parameter']
+        print(f"DEBUG: Running sweep for parameter: {name}")
 
-# --------------------------------------------------
-# Result directories
-# --------------------------------------------------
-RESULTS_DIR = PROJECT_ROOT / config['paths']['results_base']
+        values = np.arange(param_cfg['range'][0], param_cfg['range'][1], param_cfg['steps'])
 
-# Result subdirectories
-PARAM_DIR = RESULTS_DIR / config['paths']['subdirs']['param_sweep']
+        for val in values: 
+            m = base_model.copy()
+            m.update_parameters(**{name: val})
+            #print(m.param[name])
 
-# --------------------------------------------------
-# Model definition files
-# --------------------------------------------------
-MODELS_BND = PROJECT_ROOT / config['paths']['model_bnd']
-MODELS_CFG = PROJECT_ROOT / config['paths']['model_cfg']
+            res = m.run()
+            ss_df = res.get_last_nodes_probtraj()
 
-# --------------------------------------------------
-# Global variable
-# --------------------------------------------------
-EPS = config['analysis']['thresholds']['eps']
-PERBS_DICT = config.get('perturbations') # get mutations directly from config
+            ss_df['delta'] = compute_delta(ss_df, config)
+            ss_df['param_value'] = val
+            ss_df['param_name'] = name
 
+            result.append(ss_df)
 
+    combined_df = pd.concat(result, ignore_index=True)
+
+    return combined_df
+    save_df_to_csv(combined_df, PARAM_DIR, f"{perturbation}_param_sweep.csv")

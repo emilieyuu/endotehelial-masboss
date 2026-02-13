@@ -45,7 +45,7 @@ perturbations:
 # Configuration for parameter analysis
 sensitivity_analysis: 
   - parameter: "$RhoA_amp"
-    range: [5.0, 50.0]
+    range: [5.0, 100.0]
     steps: 5.0
     scale: "linear"
   - parameter: "$RhoA_mod"

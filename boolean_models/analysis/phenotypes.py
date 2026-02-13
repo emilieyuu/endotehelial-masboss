@@ -6,7 +6,7 @@ def compute_delta(df, config):
     """ Compute delta: RhoC-RhoA balance. """
     rhoA = config['analysis']['nodes']['target_a']
     rhoC = config['analysis']['nodes']['target_b']
-    print(f"DEBUG: Computing delta = {rhoC} - {rhoA}")
+    #print(f"DEBUG: Computing delta = {rhoC} - {rhoA}")
     return df[rhoC] - df[rhoA]
 
 # Phenotype timeseries
