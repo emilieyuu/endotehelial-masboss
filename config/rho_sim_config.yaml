@@ -5,7 +5,7 @@ experiment: "perturbation_simulation"
 # Paths are relative to the PROJECT_ROOT
 paths:
   model_bnd: "data/models/rho.bnd"
-  model_cfg: "data/models/rho_v1.cfg"
+  model_cfg: "data/models/rho_v2.cfg"
   results_base: "results/boolean_models/"
   subdirs:
     raw: "raw"
@@ -28,17 +28,28 @@ analysis:
 
 # Perturbation Settings
 perturbations:
-  WT: {}
+  WT:  
+    DSP: "ON"
+    TJP1: "ON"
+    JCAD: "ON"
   DSP: 
     DSP: "OFF"
+    TJP1: "ON"
+    JCAD: "ON"
   TJP1: 
+    DSP: "ON"
     TJP1: "OFF"
+    JCAD: "ON"
   JCAD:
+    DSP: "ON"
+    TJP1: "ON"
     JCAD: "OFF"
   DSP_JCAD: 
     DSP: "OFF"
+    TJP1: "ON"
     JCAD: "OFF"
   TJP1_JCAD: 
+    DSP: "ON"
     TJP1: "OFF"
     JCAD: "OFF"
 
