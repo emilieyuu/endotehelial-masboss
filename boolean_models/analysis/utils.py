@@ -1,16 +1,14 @@
+from datetime import datetime
 
-def save_df_to_csv(df, directory, file_name):
+def save_df_to_csv(df, directory, base_name):
     directory.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    file_name = f"{base_name}_{timestamp}.csv"
 
     path = directory / file_name
     stem = path.stem
     suffix = path.suffix
-
-    counter = 1
-    while path.exists():
-        new_name = f"{stem}_{counter:02d}{suffix}"
-        path = directory / new_name
-        counter += 1
 
     df.to_csv(path, index=False)
     print(f"DEBUG: File {path.name} successfully written to directory: {directory}")

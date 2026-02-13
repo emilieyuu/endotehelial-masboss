@@ -82,7 +82,7 @@ def run_perturbations(model, result_dir, config):
     print("DEBUG: All simulations completed successfully")
 
     full_perb_df = pd.concat(perbs, ignore_index=True)
-    save_df_to_csv(full_perb_df, result_dir, "perturbation_timeseries.csv")
+    save_df_to_csv(full_perb_df, result_dir, "perturbation_timeseries")
 
     # # Compute and save combined steady state data
     # ss_concat_df = pd.concat(perbs_ss)
