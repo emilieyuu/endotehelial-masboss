@@ -12,21 +12,19 @@ paths:
     processed: "processed"
     steady_state: "steady_state"
     param_sweep: "param_sweep"
-
-# Simulation Parameters
-simulation:
-  phenotypes:
-    - "Failed"
-    - "Hyper"
-    - "Normal"
+    perturbation_sim: "perturbation_sim"
+  
 
 # Analysis Settings
 analysis:
-  thresholds:
-      eps: 0.25
   nodes:
     target_a: "RhoA"
     target_b: "RhoC"
+  eps: 0.25
+  phenotypes:
+    failed: "Failed"
+    normal: "Normal"
+    hyper: "Hyper"
 
 # Perturbation Settings
 perturbations:
@@ -48,7 +46,7 @@ perturbations:
 sensitivity_analysis: 
   - parameter: "$RhoA_amp"
     range: [5.0, 50.0]
-    steps: 10.0
+    steps: 5.0
     scale: "linear"
   - parameter: "$RhoA_mod"
     range: [1.0, 8.0]
@@ -63,6 +61,26 @@ sensitivity_analysis:
     steps: 2.0
     scale: "linear"
   - parameter: "$RhoA_decay"
+    range: [0.05, 1.0]
+    steps: 0.1
+    scale: "log"
+  - parameter: "$RhoC_amp"
+    range: [5.0, 50.0]
+    steps: 5.0
+    scale: "linear"
+  - parameter: "$RhoC_mod"
+    range: [1.0, 8.0]
+    steps: 2.0
+    scale: "linear"
+  - parameter: "$RhoC_basal"
+    range: [0.1, 1.5]
+    steps: 0.5
+    scale: "log"
+  - parameter: "$RhoC_antagonistic"
+    range: [1.0, 15.0]
+    steps: 2.0
+    scale: "linear"
+  - parameter: "$RhoC_decay"
     range: [0.05, 1.0]
     steps: 0.1
     scale: "log"
