@@ -5,34 +5,52 @@ from pathlib import Path
 import yaml
 import numpy as np
 
-from boolean_models.analysis import compute_delta
+from boolean_models.analysis import (
+    compute_delta,
+    classify_phenotype,
+    save_df_to_csv, 
+)
 
-def run_param_sweep_single(model, perturbation, config, sweep_cfg):
-    base_model = model
 
+def run_param_sweep_single(base_model, result_dir, config, perturbation='WT'):
+    # Extract variables from config
+    sweep_cfg = config['sensitivity_analysis']
+    param_cfg = sweep_cfg['parameter_ranges']
+    groups = sweep_cfg['groups']
+
+
+    # Initiate list to store parameter sweep results
     result = []
     
-    for param_cfg in sweep_cfg:
-        name = param_cfg['parameter']
-        print(f"DEBUG: Running sweep for parameter: {name}")
+    # Run parameter sweep for each parameter
+    for group, features in groups.items(): 
+        for p in features['parameters']:
 
-        values = np.arange(param_cfg['range'][0], param_cfg['range'][1], param_cfg['steps'])
+            name = features['prefix'] + "_" + p
+            values = np.arange(param_cfg[p]['range'][0], param_cfg[p]['range'][1], param_cfg[p]['step'])
 
-        for val in values: 
-            m = base_model.copy()
-            m.update_parameters(**{name: val})
-            #print(m.param[name])
+            print(f"DEGUG: Performing sweep for parameter {name} with values: {values}")
 
-            res = m.run()
-            ss_df = res.get_last_nodes_probtraj()
+            for val in values: 
+                m = base_model.copy()
+                m.update_parameters(**{name: val})
 
-            ss_df['delta'] = compute_delta(ss_df, config)
-            ss_df['param_value'] = val
-            ss_df['param_name'] = name
+                res = m.run()
+                ss_df = res.get_last_nodes_probtraj()
+                ss_df['param_value'] = val
+                ss_df['param_name'] = name
 
-            result.append(ss_df)
+                delta_df = ss_df.copy()
+                delta_df['delta'] = compute_delta(delta_df, config)
+
+                phenotype_df = delta_df.copy()
+                phenotype_df['phenotype'] = delta_df['delta'].apply(lambda x: classify_phenotype(x, config))
+
+                result.append(phenotype_df)
+
+    print(f"DEBUG: Sweep of parameters for {perturbation} completed. ")
 
     combined_df = pd.concat(result, ignore_index=True)
+    save_df_to_csv(combined_df, result_dir, f"{perturbation}_param_sweep")
 
     return combined_df
-    save_df_to_csv(combined_df, PARAM_DIR, f"{perturbation}_param_sweep.csv")

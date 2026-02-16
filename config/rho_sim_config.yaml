@@ -47,40 +47,48 @@ sensitivity_analysis:
   - parameter: "$RhoA_amp"
     range: [5.0, 100.0]
     steps: 5.0
-    scale: "linear"
   - parameter: "$RhoA_mod"
     range: [1.0, 8.0]
     steps: 2.0
-    scale: "linear"
   - parameter: "$RhoA_basal"
     range: [0.1, 1.5]
     steps: 0.5
-    scale: "log"
   - parameter: "$RhoA_antagonistic"
     range: [1.0, 15.0]
     steps: 2.0
-    scale: "linear"
   - parameter: "$RhoA_decay"
     range: [0.05, 1.0]
     steps: 0.1
-    scale: "log"
   - parameter: "$RhoC_amp"
     range: [5.0, 50.0]
     steps: 5.0
-    scale: "linear"
   - parameter: "$RhoC_mod"
     range: [1.0, 8.0]
     steps: 2.0
-    scale: "linear"
   - parameter: "$RhoC_basal"
     range: [0.1, 1.5]
     steps: 0.5
-    scale: "log"
   - parameter: "$RhoC_antagonistic"
     range: [1.0, 15.0]
     steps: 2.0
-    scale: "linear"
   - parameter: "$RhoC_decay"
     range: [0.05, 1.0]
     steps: 0.1
-    scale: "log"
+
+sensitivity_analysis:
+
+  parameter_ranges:
+    amp:          { range: [5.0, 60.0], step: 5.0 }
+    mod:          { range: [1.0, 8.0],   step: 2.0 }
+    basal:        { range: [0.1, 1.5],   step: 0.5 }
+    antagonistic: { range: [1.0, 15.0],  step: 2.0 }
+    decay:        { range: [0.05, 1.0],  step: 0.1 }
+
+  groups:
+    RhoA:
+      prefix: "$RhoA"
+      parameters: [amp, mod, basal, antagonistic, decay]
+
+    RhoC:
+      prefix: "$RhoC"
+      parameters: [amp, mod, basal, antagonistic, decay]
