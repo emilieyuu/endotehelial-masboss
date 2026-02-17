@@ -93,11 +93,11 @@ sensitivity_analysis:
       prefix: "$RhoC"
       parameters: [amp, mod, basal, antagonistic, decay]
 
-    "sweep_profiles": {
-        "WT": "exhaustive",
-        "DSP_KO": ["$RhoC_antagonistic", "$RhoC_mod", "$RhoC_amp", "$RhoC_decay"],
-        "TJP1_KO": ["$RhoA_antagonistic", "$RhoA_mod", "$RhoA_amp", "$RhoA_decay"],
-        "JCAD_KO": ["$RhoA_mod", "$RhoC_mod", "$RhoA_basal", "$RhoC_basal"],
-        "DSP_JCAD_KO": ["$RhoC_mod", "$RhoC_basal", "$RhoA_basal"],
-        "TJP1_JCAD_KO": ["$RhoA_mod", "$RhoA_basal", "$RhoC_basal"]
-    }
+  sweep_profiles: 
+    WT: "exhaustive"
+    DSP: ["$RhoC_antagonistic", "$RhoC_mod", "$RhoC_amp", "$RhoC_decay"]
+    TJP1: ["$RhoA_antagonistic", "$RhoA_mod", "$RhoA_amp", "$RhoA_decay"]
+    JCAD: ["$RhoA_mod", "$RhoC_mod", "$RhoA_basal", "$RhoC_basal"]
+    DSP_JCAD: ["$RhoC_mod", "$RhoC_basal", "$RhoA_basal"]
+    TJP1_JCAD: ["$RhoA_mod", "$RhoA_basal", "$RhoC_basal"]
+    

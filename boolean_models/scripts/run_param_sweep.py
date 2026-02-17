@@ -12,27 +12,37 @@ from boolean_models.analysis import (
 )
 
 
-def run_param_sweep_single(base_model, result_dir, config, perturbation='WT'):
+def run_param_sweep(model, result_dir, config, perturbation='WT'):
     # Extract variables from config
     sweep_cfg = config['sensitivity_analysis']
     param_cfg = sweep_cfg['parameter_ranges']
     groups = sweep_cfg['groups']
 
+    # Identify which parameters to sweep based on the profile
+    profile = sweep_cfg['sweep_profiles'][perturbation]
 
     # Initiate list to store parameter sweep results
     result = []
     
-    # Run parameter sweep for each parameter
+    # Run parameter sweep for each parameter (for each group)
+    print(f"DEGUG: Starting sweep for perturbation {perturbation}")
     for group, features in groups.items(): 
+        # For each parameter
         for p in features['parameters']:
+            name = f"${group}_{p}"
 
-            name = features['prefix'] + "_" + p
+            # Skip parameters in non-exhaustive KO scenarios
+            if profile != "exhaustive" and name not in profile: 
+                continue
+            
+            # Setup sweeping ranges
             values = np.arange(param_cfg[p]['range'][0], param_cfg[p]['range'][1], param_cfg[p]['step'])
 
             print(f"DEGUG: Performing sweep for parameter {name} with values: {values}")
 
+            # Perform sweep
             for val in values: 
-                m = base_model.copy()
+                m = model.copy()
                 m.update_parameters(**{name: val})
 
                 res = m.run()
