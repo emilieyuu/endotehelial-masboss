@@ -78,10 +78,10 @@ sensitivity_analysis:
 sensitivity_analysis:
 
   parameter_ranges:
-    amp:          { range: [5.0, 60.0], step: 5.0 }
-    mod:          { range: [1.0, 8.0],   step: 2.0 }
-    basal:        { range: [0.1, 1.5],   step: 0.5 }
-    antagonistic: { range: [1.0, 15.0],  step: 2.0 }
+    amp:          { range: [5.0, 60.0], step: 4.0 }
+    mod:          { range: [1.0, 8.0],   step: 1.0 }
+    basal:        { range: [0.1, 1.5],   step: 0.2 }
+    antagonistic: { range: [1.0, 10.0],  step: 0.5 }
     decay:        { range: [0.05, 1.0],  step: 0.1 }
 
   groups:
@@ -92,3 +92,12 @@ sensitivity_analysis:
     RhoC:
       prefix: "$RhoC"
       parameters: [amp, mod, basal, antagonistic, decay]
+
+    "sweep_profiles": {
+        "WT": "exhaustive",
+        "DSP_KO": ["$RhoC_antagonistic", "$RhoC_mod", "$RhoC_amp", "$RhoC_decay"],
+        "TJP1_KO": ["$RhoA_antagonistic", "$RhoA_mod", "$RhoA_amp", "$RhoA_decay"],
+        "JCAD_KO": ["$RhoA_mod", "$RhoC_mod", "$RhoA_basal", "$RhoC_basal"],
+        "DSP_JCAD_KO": ["$RhoC_mod", "$RhoC_basal", "$RhoA_basal"],
+        "TJP1_JCAD_KO": ["$RhoA_mod", "$RhoA_basal", "$RhoC_basal"]
+    }
