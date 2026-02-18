@@ -6,9 +6,8 @@ def compute_delta(df, config):
     """ Compute delta: RhoC-RhoA balance. """
     rhoA = config['analysis']['nodes']['target_a']
     rhoC = config['analysis']['nodes']['target_b']
-    #print(f"DEBUG: Computing delta = {rhoC} - {rhoA}")
-    return df[rhoC] - df[rhoA]
 
+    return df[rhoC] - df[rhoA]
 
 def classify_phenotype(delta, config):
     """ Compute phenotype based on delta. """
@@ -21,4 +20,5 @@ def classify_phenotype(delta, config):
         return labels["hyper"]
     else:
         return labels["normal"]
+    
 

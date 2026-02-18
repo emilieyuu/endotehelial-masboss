@@ -132,6 +132,9 @@ def run_2d_sweep(base_model, exp, perb_config, param_values):
 
     return pd.concat(results)
 
+# --------------------------------------------------
+# Full Combined Param Sweep
+# --------------------------------------------------
 def run_sweeps(base_model, result_dir, sweep_config, sim_config):
     perb_config = sim_config['perturbations']
     param_values = build_ranges(sweep_config)

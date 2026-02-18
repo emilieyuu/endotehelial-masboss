@@ -6,7 +6,7 @@ experiment: "perturbation_simulation"
 paths:
   model_bnd: "data/models/rho.bnd"
   model_cfg: "data/models/rho_v2.cfg"
-  results_base: "results/boolean_models/exploratory"
+  results_base: "results/boolean_models/final"
   subdirs:
     raw: "raw"
     processed: "processed"
