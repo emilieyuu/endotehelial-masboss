@@ -14,7 +14,7 @@ from boolean_models.analysis import (
 # --------------------------------------------------
 # Helper Functions
 # --------------------------------------------------
-def build_ranges(sweep_config):
+def build_ranges(sweep_config, resolution="fine"):
     # Extract group, range and step info
     ranges = sweep_config['ranges']
     groups = sweep_config['groups']
@@ -27,8 +27,13 @@ def build_ranges(sweep_config):
             # Construct parameter name
             p_name = f"${group}_{p}"
 
-            # Setup sweeping values
-            values = np.arange(info['start'], info['stop'], info['step'])
+            # Determine the step size based on resolution
+            step = info['step']
+            if resolution == "coarse":
+                step *= 2
+
+            # Generate values
+            values = np.arange(info['start'], info['stop'], step)
             param_dict[p_name] = values
             
     return param_dict
@@ -37,27 +42,25 @@ def build_ranges(sweep_config):
 # --------------------------------------------------
 # Experiment Runs
 # --------------------------------------------------
-def run_1d_sweeps(base_model, exp_config, perb_config, param_values):
+def run_1d_sweep_single(base_model, exp, perb_config, param_values):
     """
     Run all 1D experiments, and return a combined DataFrame with results. 
-    
-    :param base_model: Description
-    :param exp_config: Description
-    :param perb_config: Description
-    :param param_values: Description
     """
     # Initiate list to store results
     results = []
+    exp_name = exp['name']
+    params = exp['parameters']
+    perturbations = exp['perturbations']
 
-    for perb, params in exp_config.items():
+    # Resolve "all" to parameter list
+    if params == 'all': 
+        params = param_values.keys()
+
+    for perb in perturbations: 
+        print(f"DEBUG: Starting {exp_name} sweep for perturbation: {perb} with {params}")
+
         # Create model for KO scenaro
         perb_model = generate_ko_model(base_model, perb_config[perb])
-
-        # Resolve "all" to parameter list
-        if params == 'all': 
-            params = param_values.keys()
-
-        print(f"DEBUG: Starting 1D sweep for perturbation: {perb} with parameter {params}")
 
         for p in params:
             # Get values to sweep for parameter
@@ -72,25 +75,25 @@ def run_1d_sweeps(base_model, exp_config, perb_config, param_values):
                 res = m_temp.run()
                 ss_df = res.get_last_nodes_probtraj()
 
-                # Append info columns
-                ss_df[['p_name', 'p_value', 'perb']] = pd.DataFrame([[p, v, perb]], index=ss_df.index)
+                # Unified Metadata columns
+                ss_df['p1_name'] = p
+                ss_df['p1_value'] = v
+                ss_df['p2_name'] = "N/A" # Keeps DF shape consistent with 2D
+                ss_df['p2_value'] = np.nan
+                ss_df['perturbation'] = perb
+                ss_df['exp_name'] = exp_name
 
                 results.append(ss_df)
 
-        print("DEBUG: All 1D sweeps completed")
+        print(f"DEBUG: Completed {exp_name} sweep for perturbation: {perb}")
     
     # Return dataframe of concatenated results for all 1D experiments
     return pd.concat(results)
 
 
-def run_2d_sweep(base_model, exp, perb_config, param_values):
+def run_2d_sweep_single(base_model, exp, perb_config, param_values):
     """
     Run all 2D experiments, and return a combined DataFrame with results.
-    
-    :param base_model: Description
-    :param exp_config: Description
-    :param perb_config: Description
-    :param param_values: Description
     """
     # Initiate list to store results
     results = []
@@ -100,9 +103,9 @@ def run_2d_sweep(base_model, exp, perb_config, param_values):
     perbs = exp['perturbations']
     p1, p2 = exp['parameters']
 
-    print(f"DEBUG: Starting 2D sweep experiment {exp_name} with parameters {p1, p2}")
-
     for perb in perbs:
+        print(f"DEBUG: Starting {exp_name} sweep for perturbation: {perb}")
+
         # Create model for KO scenaro
         perb_model = generate_ko_model(base_model, perb_config[perb])
 
@@ -123,8 +126,11 @@ def run_2d_sweep(base_model, exp, perb_config, param_values):
             res = m_temp.run()
             ss_df = res.get_last_nodes_probtraj()
 
-            # Append info columns
-            ss_df[[p1, p2, 'perb', 'exp_name']] = pd.DataFrame([[v1, v2, perb, exp_name]], index=ss_df.index)
+            # Metadata columns
+            ss_df['p1_name'], ss_df['p1_value'] = p1, v1
+            ss_df['p2_name'], ss_df['p2_value'] = p2, v2
+            ss_df['perturbation'] = perb
+            ss_df['exp_name'] = exp_name
 
             results.append(ss_df)
             
@@ -135,29 +141,56 @@ def run_2d_sweep(base_model, exp, perb_config, param_values):
 # --------------------------------------------------
 # Full Combined Param Sweep
 # --------------------------------------------------
-def run_sweeps(base_model, result_dir, sweep_config, sim_config):
+def run_sweeps(base_model, result_dir, sweep_config, sim_config, target_exp=None):
+    """
+    Orchestrates the running of experiments. 
+    If target_experiments are provided (list), only those experiment runs.
+    """
     perb_config = sim_config['perturbations']
-    param_values = build_ranges(sweep_config)
-    exp_1d_cfg = sweep_config['1D_experiments']
-    exp_2d_cfg = sweep_config['2D_experiments']
+    all_exps = sweep_config['experiments']
+    #exp_2d_cfg = sweep_config['2D_experiments']
 
-    sweep_results = {}
+    # Filter if we only want one specific run
+    if target_exp:
+        all_exps = [e for e in all_exps if e['name'] in target_exp]
+        if not all_exps:
+            print(f"ERROR: One of {target_exp} not found in config.")
+            return
+        
+    sweep_results = []
+    for exp in all_exps:
+        # Determine resolution from config
+        res_type = exp['resolution']
+        param_values = build_ranges(sweep_config, resolution=res_type)
 
-    try: 
-        sweep_results["1D_sweeps"] = run_1d_sweeps(base_model, exp_1d_cfg, perb_config, param_values)
-    except Exception as e: 
-        print(str(e))
-    
-    for exp in exp_2d_cfg:
-        try: 
-            sweep_results[f"2D_{exp['name']}"] = run_2d_sweep(base_model, exp, perb_config, param_values)
-        except Exception as e: 
-            print(str(e))
-    
-    for name, df in sweep_results.items():
-        df['delta'] = compute_delta(df, sim_config)
-        df['phenotype'] = df['delta'].apply(lambda x: classify_phenotype(x, sim_config))
-        save_df_to_csv(df, result_dir, name)
+        print(f"\n>>> DEBUG: Initialising: {exp['name']} ({exp['type']})")
 
-    return sweep_results
+        try:
+            # Choose the runner based on type
+            if exp['type'] == "1D":
+                df = run_1d_sweep_single(base_model, exp, perb_config, param_values)
+            elif exp['type'] == "2D":
+                df = run_2d_sweep_single(base_model, exp, perb_config, param_values)
+            else:
+                print(f"Unknown type {exp['type']} for {exp['name']}")
+                continue
+
+            # Post-processing (Delta & Phenotype)
+            df['type'] = exp['type'] == "1D"
+            df['delta'] = compute_delta(df, sim_config)
+            df['phenotype'] = df['delta'].apply(lambda x: classify_phenotype(x, sim_config))
+            sweep_results.append(df)
+            
+            # Save individual experiment result
+            save_df_to_csv(df, result_dir, f"{exp['type']}_{exp['name']}")
+            print(f">>> DEBUG: {exp['name']} successfully saved to {result_dir}")
+
+        except Exception as e:
+            print(f"ERROR: Failed experiment {exp['name']}: {str(e)}")
+
+    full_sweep_df = pd.concat(sweep_results)
+    save_df_to_csv(full_sweep_df, result_dir, f"param_sweep_full")
+    print(f"DEBUG: Combined parameter sweep experiment data saved to {result_dir}")
+
+    return full_sweep_df
 

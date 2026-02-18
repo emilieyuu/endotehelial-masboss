@@ -2,10 +2,10 @@
 experiment: "parameter_sweep"
 
 ranges:
-  amp:          { start: 5.0, stop: 60.0, step: 5.0 }
+  amp:          { start: 5.0, stop: 30.0, step: 2.5 }
   mod:          { start: 1.0, stop: 8.0,  step: 1.0 }
-  basal:        { start: 0.1, stop: 1.5, step: 0.5 }
-  antagonistic: { start: 1.0, stop: 15.0, step: 1.0 }
+  basal:        { start: 0.1, stop: 1.5, step: 0.2 }
+  antagonistic: { start: 1.0, stop: 16.0, step: 1.0 }
   decay:        { start: 0.05, stop: 1.0, step: 0.1 }
 
 groups: ["RhoA", "RhoC"]
@@ -18,19 +18,59 @@ groups: ["RhoA", "RhoC"]
   DSP_JCAD: ["$RhoC_mod", "$RhoC_basal", "$RhoA_basal"]
   TJP1_JCAD: ["$RhoA_mod", "$RhoA_basal", "$RhoC_basal"]
 
-2D_experiments: 
-  - name: "Competition_Landscape"
+experiments: 
+  - name: "WT_Sweep"
     perturbations: ["WT"]
+    type: "1D"
+    resolution: "fine"
+    parameters: "all"
+  - name: "DSP_Sweep"
+    perturbations: ["DSP"]
+    type: "1D"
+    resolution: "fine"
+    parameters: ["$RhoC_antagonistic", "$RhoC_mod", "$RhoC_amp", "$RhoC_decay"]
+  - name: "TJP1_Sweep"
+    perturbations: ["TJP1"]
+    type: "1D"
+    resolution: "fine"
+    parameters: ["$RhoA_antagonistic", "$RhoA_mod", "$RhoA_amp", "$RhoA_decay"]
+  - name: "JCAD_Sweep"
+    perturbations: ["JCAD"]
+    type: "1D"
+    resolution: "fine"
+    parameters: ["$RhoA_mod", "$RhoC_mod", "$RhoA_basal", "$RhoC_basal"]
+  - name: "DSP_JCAD_Sweep"
+    perturbations: ["DSP_JCAD"]
+    type: "1D"
+    resolution: "fine"
+    parameters: ["$RhoC_mod", "$RhoC_basal", "$RhoA_basal"]
+  - name: "DSP_TJP1_Sweep"
+    perturbations: ["DSP_TJP1"]
+    type: "1D"
+    resolution: "fine"
+    parameters: ["$RhoA_mod", "$RhoA_basal", "$RhoC_basal"]
+  - name: "Competition_Landscape"
+    perturbations: ["WT", "TJP1", "DSP"]
+    type: "2D"
+    resolution: "coarse"
     parameters: ["$RhoA_antagonistic", "$RhoC_antagonistic"]
   - name: "Escape_Threshold_RhoA"
     perturbations: ["WT", "TJP1"]
+    type: "2D"
+    resolution: "coarse"
     parameters: ["$RhoA_amp", "$RhoA_antagonistic"]
   - name: "Escape_Threshold_RhoC"
     perturbations: ["WT", "DSP"]
+    type: "2D"
+    resolution: "coarse"
     parameters: ["$RhoC_amp", "$RhoC_antagonistic"]
   - name: "Amplification_Gain_RhoA"
     perturbations: ["WT", "JCAD", "TJP1_JCAD"]
+    type: "2D"
+    resolution: "coarse"
     parameters: ["$RhoA_amp", "$RhoA_mod"]
   - name: "Amplification_Gain_RhoC"
     perturbations: ["WT", "JCAD", "DSP_JCAD"]
+    type: "2D"
+    resolution: "coarse"
     parameters: ["$RhoC_amp", "$RhoC_mod"]

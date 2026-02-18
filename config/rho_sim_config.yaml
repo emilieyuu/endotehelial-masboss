@@ -6,11 +6,13 @@ experiment: "perturbation_simulation"
 paths:
   model_bnd: "data/models/rho.bnd"
   model_cfg: "data/models/rho_v2.cfg"
-  results_base: "results/boolean_models"
+  results_base: "results/boolean_models/final"
+  figures_base: "figures/boolean_models"
   subdirs:
     param_sweep: "param_sweep"
     perturbation_sim: "perturbation_sim"
-    figures_perbs: "figures_perbs"
+    perturbation_figs: "perturbation_figs"
+    param_sweep_figs: "param_sweep_figs"
   
 
 # Analysis Settings
@@ -27,15 +29,8 @@ analysis:
 # Perturbation Settings
 perturbations:
   WT:  {}
-  DSP: 
-    DSP: "OFF"
-  TJP1: 
-    TJP1: "OFF"
-  JCAD:
-    JCAD: "OFF"
-  DSP_JCAD: 
-    DSP: "OFF"
-    JCAD: "OFF"
-  TJP1_JCAD: 
-    TJP1: "OFF"
-    JCAD: "OFF"
+  DSP: {DSP: "OFF"}
+  TJP1: {TJP1: "OFF"}
+  JCAD: {JCAD: "OFF"}
+  DSP_JCAD: {DSP: "OFF", JCAD: "OFF"}
+  TJP1_JCAD: {TJP1: "OFF", JCAD: "OFF"}
