@@ -1,0 +1,61 @@
+# Metadata
+experiment: "parameter_sweep"
+
+ranges:
+  amp:          { start: 5.0, stop: 60.0, step: 5.0 }
+  mod:          { start: 1.0, stop: 8.0,  step: 1.0 }
+  basal:        { start: 0.1, stop: 1.5, step: 0.5 }
+  antagonistic: { start: 1.0, stop: 15.0, step: 1.0 }
+  decay:        { start: 0.05, stop: 1.0, step: 0.1 }
+
+groups: ["RhoA", "RhoC"]
+
+1D_experiments: 
+  WT: "all"
+  DSP: ["$RhoC_antagonistic", "$RhoC_mod", "$RhoC_amp", "$RhoC_decay"]
+  TJP1: ["$RhoA_antagonistic", "$RhoA_mod", "$RhoA_amp", "$RhoA_decay"]
+  JCAD: ["$RhoA_mod", "$RhoC_mod", "$RhoA_basal", "$RhoC_basal"]
+  DSP_JCAD: ["$RhoC_mod", "$RhoC_basal", "$RhoA_basal"]
+  TJP1_JCAD: ["$RhoA_mod", "$RhoA_basal", "$RhoC_basal"]
+
+2D_experiments: 
+  - name: "Competition_Landscape"
+    perturbations: ["WT"]
+    parameters: ["$RhoA_antagonistic", "$RhoC_antagonistic"]
+  - name: "Escape_Threshold_RhoA"
+    perturbations: ["WT", "TJP1"]
+    parameters: ["$RhoA_amp", "$RhoA_antagonistic"]
+
+experiments: 
+  - name: "WT_Sweep"
+    perturbations: ["WT"]
+    type: "1D"
+    parameters: "all"
+  - name: "DSP_Sweep"
+    perturbations: ["DSP"]
+    type: "1D"
+    parameters: ["$RhoC_antagonistic", "$RhoC_mod", "$RhoC_amp", "$RhoC_decay"]
+  - name: "TJP1_Sweep"
+    perturbations: ["TJP1"]
+    type: "1D"
+    parameters: ["$RhoA_antagonistic", "$RhoA_mod", "$RhoA_amp", "$RhoA_decay"]
+  - name: "JCAD_Sweep"
+    perturbations: ["JCAD"]
+    type: "1D"
+    parameters: ["$RhoA_mod", "$RhoC_mod", "$RhoA_basal", "$RhoC_basal"]
+  - name: "DSP_JCAD_Sweep"
+    perturbations: ["DSP_JCAD"]
+    type: "1D"
+    parameters: ["$RhoC_mod", "$RhoC_basal", "$RhoA_basal"]
+  - name: "TJP1_JCAD_Sweep"
+    perturbations: ["TJP1_JCAD"]
+    type: "1D"
+    parameters: ["$RhoA_mod", "$RhoA_basal", "$RhoC_basal"]
+  - name: "Competition_Landscape"
+    perturbations: ["WT"]
+    type: "2D"
+    parameters: ["$RhoA_antagonistic", "$RhoC_antagonistic"]
+  - name: "Escape_Threshold_RhoA"
+    perturbations: ["WT", "TJP1"]
+    type: "2D"
+    parameters: ["$RhoA_amp", "$RhoA_antagonistic"]

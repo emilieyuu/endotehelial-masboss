@@ -86,11 +86,9 @@ sensitivity_analysis:
 
   groups:
     RhoA:
-      prefix: "$RhoA"
       parameters: [amp, mod, basal, antagonistic, decay]
 
-    RhoC:
-      prefix: "$RhoC"
+    RhoC: 
       parameters: [amp, mod, basal, antagonistic, decay]
 
   sweep_profiles: 
