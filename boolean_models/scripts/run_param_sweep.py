@@ -142,10 +142,17 @@ def run_sweeps(base_model, result_dir, sweep_config, sim_config):
     exp_2d_cfg = sweep_config['2D_experiments']
 
     sweep_results = {}
-    sweep_results["1D_sweeps"] = run_1d_sweeps(base_model, exp_1d_cfg, perb_config, param_values)
 
+    try: 
+        sweep_results["1D_sweeps"] = run_1d_sweeps(base_model, exp_1d_cfg, perb_config, param_values)
+    except Exception as e: 
+        print(str(e))
+    
     for exp in exp_2d_cfg:
-        sweep_results[f"2D_{exp['name']}"] = run_2d_sweep(base_model, exp, perb_config, param_values)
+        try: 
+            sweep_results[f"2D_{exp['name']}"] = run_2d_sweep(base_model, exp, perb_config, param_values)
+        except Exception as e: 
+            print(str(e))
     
     for name, df in sweep_results.items():
         df['delta'] = compute_delta(df, sim_config)

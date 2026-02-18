@@ -6,13 +6,11 @@ experiment: "perturbation_simulation"
 paths:
   model_bnd: "data/models/rho.bnd"
   model_cfg: "data/models/rho_v2.cfg"
-  results_base: "results/boolean_models/final"
+  results_base: "results/boolean_models"
   subdirs:
-    raw: "raw"
-    processed: "processed"
-    steady_state: "steady_state"
     param_sweep: "param_sweep"
     perturbation_sim: "perturbation_sim"
+    figures_perbs: "figures_perbs"
   
 
 # Analysis Settings
@@ -41,61 +39,3 @@ perturbations:
   TJP1_JCAD: 
     TJP1: "OFF"
     JCAD: "OFF"
-
-# Configuration for parameter analysis
-sensitivity_analysis: 
-  - parameter: "$RhoA_amp"
-    range: [5.0, 100.0]
-    steps: 5.0
-  - parameter: "$RhoA_mod"
-    range: [1.0, 8.0]
-    steps: 2.0
-  - parameter: "$RhoA_basal"
-    range: [0.1, 1.5]
-    steps: 0.5
-  - parameter: "$RhoA_antagonistic"
-    range: [1.0, 15.0]
-    steps: 2.0
-  - parameter: "$RhoA_decay"
-    range: [0.05, 1.0]
-    steps: 0.1
-  - parameter: "$RhoC_amp"
-    range: [5.0, 50.0]
-    steps: 5.0
-  - parameter: "$RhoC_mod"
-    range: [1.0, 8.0]
-    steps: 2.0
-  - parameter: "$RhoC_basal"
-    range: [0.1, 1.5]
-    steps: 0.5
-  - parameter: "$RhoC_antagonistic"
-    range: [1.0, 15.0]
-    steps: 2.0
-  - parameter: "$RhoC_decay"
-    range: [0.05, 1.0]
-    steps: 0.1
-
-sensitivity_analysis:
-
-  parameter_ranges:
-    amp:          { range: [5.0, 60.0], step: 4.0 }
-    mod:          { range: [1.0, 8.0],   step: 1.0 }
-    basal:        { range: [0.1, 1.5],   step: 0.2 }
-    antagonistic: { range: [1.0, 10.0],  step: 0.5 }
-    decay:        { range: [0.05, 1.0],  step: 0.1 }
-
-  groups:
-    RhoA:
-      parameters: [amp, mod, basal, antagonistic, decay]
-
-    RhoC: 
-      parameters: [amp, mod, basal, antagonistic, decay]
-
-  sweep_profiles: 
-    WT: "exhaustive"
-    DSP: ["$RhoC_antagonistic", "$RhoC_mod", "$RhoC_amp", "$RhoC_decay"]
-    TJP1: ["$RhoA_antagonistic", "$RhoA_mod", "$RhoA_amp", "$RhoA_decay"]
-    JCAD: ["$RhoA_mod", "$RhoC_mod", "$RhoA_basal", "$RhoC_basal"]
-    DSP_JCAD: ["$RhoC_mod", "$RhoC_basal", "$RhoA_basal"]
-    TJP1_JCAD: ["$RhoA_mod", "$RhoA_basal", "$RhoC_basal"]
-    

@@ -1,8 +1,5 @@
 import maboss
 import pandas as pd
-from pathlib import Path
-import shutil
-import yaml
 
 from boolean_models.analysis import (
     compute_delta,
