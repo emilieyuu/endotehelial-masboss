@@ -6,8 +6,8 @@ experiment: "perturbation_simulation"
 paths:
   model_bnd: "data/models/rho.bnd"
   model_cfg: "data/models/rho_v3.cfg"
-  results_base: "results/boolean_models/final"
-  figures_base: "figures/boolean_models"
+  results_base: "results/boolean_models/final/rho_v3"
+  figures_base: "figures/boolean_models/run_2"
   subdirs:
     param_sweep: "param_sweep"
     perturbation_sim: "perturbation_sim"

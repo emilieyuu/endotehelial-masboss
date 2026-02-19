@@ -1,10 +1,13 @@
 from datetime import datetime
 
-def save_df_to_csv(df, directory, base_name):
+def save_df_to_csv(df, directory, base_name, timestamp=False):
     directory.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_name = f"{base_name}_{timestamp}.csv"
+    if timestamp:
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        file_name = f"{base_name}_{timestamp}.csv"
+    else: 
+         file_name = f"{base_name}.csv"
 
     path = directory / file_name
     stem = path.stem
