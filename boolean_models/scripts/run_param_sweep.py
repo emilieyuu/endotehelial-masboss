@@ -176,7 +176,7 @@ def run_sweeps(base_model, result_dir, sweep_config, sim_config, target_exp=None
                 continue
 
             # Post-processing (Delta & Phenotype)
-            df['type'] = exp['type'] == "1D"
+            df['type'] = exp['type']
             df['delta'] = compute_delta(df, sim_config)
             df['phenotype'] = df['delta'].apply(lambda x: classify_phenotype(x, sim_config))
             sweep_results.append(df)

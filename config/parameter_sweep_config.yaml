@@ -2,7 +2,7 @@
 experiment: "parameter_sweep"
 
 ranges:
-  amp:          { start: 5.0, stop: 30.0, step: 2.5 }
+  amp:          { start: 5.0, stop: 40.0, step: 2.5 }
   mod:          { start: 1.0, stop: 8.0,  step: 1.0 }
   basal:        { start: 0.1, stop: 1.5, step: 0.2 }
   antagonistic: { start: 1.0, stop: 16.0, step: 1.0 }

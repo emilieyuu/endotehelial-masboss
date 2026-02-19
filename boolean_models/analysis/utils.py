@@ -4,7 +4,7 @@ def save_df_to_csv(df, directory, base_name):
     directory.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_name = f"{base_name}.csv"
+    file_name = f"{base_name}_{timestamp}.csv"
 
     path = directory / file_name
     stem = path.stem
