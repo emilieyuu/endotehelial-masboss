@@ -44,11 +44,16 @@ experiments:
     type: "1D"
     resolution: "fine"
     parameters: ["$RhoC_mod", "$RhoC_basal", "$RhoA_basal"]
+  - name: "TJP1_JCAD_Sweep"
+    perturbations: ["TJP1_JCAD_DKO"]
+    type: "1D"
+    resolution: "fine"
+    parameters: ["$RhoA_mod", "$RhoA_basal", "$RhoC_basal"]
   - name: "DSP_TJP1_Sweep"
     perturbations: ["DSP_TJP1_DKO"]
     type: "1D"
     resolution: "fine"
-    parameters: ["$RhoA_mod", "$RhoA_basal", "$RhoC_basal"]
+    parameters: ["$RhoA_basal", "$RhoC_basal"]
   - name: "Competition_Landscape"
     perturbations: ["WT", "TJP1_KO", "DSP_KO"]
     type: "2D"
@@ -74,3 +79,8 @@ experiments:
     type: "2D"
     resolution: "coarse"
     parameters: ["$RhoC_amp", "$RhoC_mod"]
+  - name: "Basal_Activity_Robustness"
+    perturbations: ["WT"]
+    type: "2D"
+    resolution: "coarse"
+    parameters: ["$RhoA_basal", "$RhoC_basal"]
