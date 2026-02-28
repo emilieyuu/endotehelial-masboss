@@ -78,9 +78,9 @@ def plot_param_panel(ax, data, param_name, eps, add_phenotype=False):
     ax.set_xlim(left=0)
     ax.axhline(0, color='black', linestyle='--', linewidth=0.8)
 
-def plot_1d(df_1d, eps=0.25, group=None, outdir=None):
+def plot_1d(df_1d, title=None, eps=0.25, group=None, outdir=None):
 
-    fig, axes = create_subplot_layout(len(group))
+    fig, axes = create_subplot_layout(len(group), title=title)
 
     for ax, p in zip(axes, group):
         data = df_1d[df_1d['p1_name'] == p]
@@ -110,10 +110,11 @@ def add_heatmap_colorbar(fig, heatmap):
     cbar.set_label("Delta (RhoC - RhoA)", labelpad=10)
     
     # Colorbar labels
-    cbar_ax.text(0.5, 1.06, 'Failed', color='red', ha='center', va='top', 
+    cbar_ax.text(0.5, 1.06, 'Hyper', color='blue', ha='center', va='top', 
+                transform=cbar_ax.transAxes, fontsize=8.5)
+    cbar_ax.text(0.5, -0.06, 'Failed', color='red', ha='center', va='bottom', 
                  transform=cbar_ax.transAxes, fontsize=8.5)
-    cbar_ax.text(0.5, -0.06, 'Hyper', color='blue', ha='center', va='bottom', 
-                 transform=cbar_ax.transAxes, fontsize=8.5)
+ 
 
     
 def plot_experiment_heatmaps(exp_df, outdir=None):
@@ -131,7 +132,7 @@ def plot_experiment_heatmaps(exp_df, outdir=None):
         pivot_df = perb_df.pivot(index='p1_value', columns='p2_value', values='delta')
 
         hm = sns.heatmap(
-            pivot_df, cmap="RdBu_r",
+            pivot_df, cmap="RdBu",
             center=0, vmin=vmin, vmax=vmax, cbar=False, ax=ax
         )
         ax.set_title(perb, pad=10)
