@@ -29,8 +29,8 @@ analysis:
 # Perturbation Settings
 perturbations:
   WT:  {}
-  DSP: {DSP: "OFF"}
-  TJP1: {TJP1: "OFF"}
-  JCAD: {JCAD: "OFF"}
-  DSP_JCAD: {DSP: "OFF", JCAD: "OFF"}
-  TJP1_JCAD: {TJP1: "OFF", JCAD: "OFF"}
+  DSP_KO: {DSP: "OFF"}
+  TJP1_KO: {TJP1: "OFF"}
+  JCAD_KO: {JCAD: "OFF"}
+  DSP_JCAD_DKO: {DSP: "OFF", JCAD: "OFF"}
+  TJP1_JCAD_DKO: {TJP1: "OFF", JCAD: "OFF"}
