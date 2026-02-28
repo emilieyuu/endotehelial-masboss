@@ -182,8 +182,8 @@ def run_sweeps(base_model, result_dir, sweep_config, sim_config, target_exp=None
             sweep_results.append(df)
             
             # Save individual experiment result
-            save_df_to_csv(df, result_dir, f"{exp['type']}_{exp['name']}")
-            print(f">>> DEBUG: {exp['name']} successfully saved to {result_dir}")
+            #save_df_to_csv(df, result_dir, f"{exp['type']}_{exp['name']}")
+            #print(f">>> DEBUG: {exp['name']} successfully saved to {result_dir}")
 
         except Exception as e:
             print(f"ERROR: Failed experiment {exp['name']}: {str(e)}")
