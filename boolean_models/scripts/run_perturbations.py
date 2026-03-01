@@ -11,12 +11,19 @@ from boolean_models.analysis import (
 # --------------------------------------------------
 # Run perturbation
 # --------------------------------------------------
-def run_perturbations(base_model, result_dir, config):
+def run_perturbations(base_model, cfg, result_dir=None):
     """
-    Run MaBoSS simulations for WT and all KO perturbations, RhoA/RhoC balance.
+    Run MaBoSS simulations for all pertubations.
+
+    param base_model (maboss.simulation): MasBoSS model to modify for each perb. 
+    param cfg (dict-like): config containing simualtion details.
+    param result_dir (Path): Optionally save sim result as csv. 
+
+    return full_perb_df (DataFrame): Full timeseries for each perturbation. 
+    return ss_df (DataFrame): Final steady state probabilities only. 
     """
     # Get dictionary of perturbations from config
-    perbs_dict = config['perturbations']
+    perbs_dict = cfg['perturbations']
 
     # Initiate list to store perturbation results
     perbs = []
@@ -35,20 +42,26 @@ def run_perturbations(base_model, result_dir, config):
 
         # Compute Rho balance (delta)
         balance_df = prob_df.copy()  
-        balance_df["delta"] = compute_delta(balance_df, config)
+        balance_df["delta"] = compute_delta(balance_df, cfg)
         
         # Classify respective phenotypes
         phenotype_df = balance_df.copy()
-        phenotype_df['phenotype'] = balance_df['delta'].apply(lambda x: classify_phenotype(x, config))
+        phenotype_df['phenotype'] = balance_df['delta'].apply(lambda x: classify_phenotype(x, cfg))
 
         perbs.append(phenotype_df)
 
     print("DEBUG: All simulations completed successfully")
 
+    # DataFrame timeseries of all perturbations
     full_perb_df = pd.concat(perbs, ignore_index=True)
-    save_df_to_csv(full_perb_df, result_dir, "perturbation_timeseries")
 
-    return full_perb_df
+    # DataFrame of steadystate node probabilities only
+    ss_mask = full_perb_df.groupby('perturbation')['t'].idxmax()
+    ss_df = full_perb_df.loc[ss_mask].reset_index(drop=True)
 
-if __name__ == "__main__":
-    perb_dict = run_perturbations()
+
+    if result_dir is not None: 
+        save_df_to_csv(full_perb_df, result_dir, "perturbation_timeseries")
+        save_df_to_csv(ss_df, result_dir, "perturbation_steady_state")
+
+    return full_perb_df, ss_df
