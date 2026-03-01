@@ -1,0 +1,19 @@
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+# Core directories
+CONFIG_DIR = PROJECT_ROOT / "config"
+DATA_DIR = PROJECT_ROOT / "data"
+RESULTS_DIR = PROJECT_ROOT / "results"
+FIGURES_DIR = PROJECT_ROOT / "figures"
+
+# Boolean model specific
+BM_DIR = PROJECT_ROOT / "boolean_models"
+
+BM_RESULTS_DIR = RESULTS_DIR / "boolean_models"
+BM_FIG_DIR = FIGURES_DIR / "boolean_models"
+
+PARAM_FIG_DIR = BM_FIG_DIR / "param_sweep_figs"
+PERB_FIG_DIR = BM_FIG_DIR / "perturbation_figs"

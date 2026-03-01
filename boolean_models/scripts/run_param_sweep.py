@@ -38,6 +38,20 @@ def build_ranges(sweep_config, resolution="fine"):
             
     return param_dict
 
+def get_filename(target_exp, target_type):
+    n_exps = len(target_exp) if target_exp else 0
+
+    if target_type and not target_exp: # 1D or 2D
+        filename = f"param_sweep_{target_type}"
+    elif target_exp and n_exps == 1: # One experiment only
+        filename = f"param_sweep_{target_exp[0]}"
+    elif target_exp and n_exps > 1: # Multple experiments
+        filename = f"param_sweep_{n_exps}_selected_experiments"
+    else:
+        filename = "param_sweep_full"
+
+    return filename
+
 
 # --------------------------------------------------
 # Experiment Runs
@@ -78,7 +92,7 @@ def run_1d_sweep_single(base_model, exp, perb_config, param_values):
                 # Unified Metadata columns
                 ss_df['p1_name'] = p
                 ss_df['p1_value'] = v
-                ss_df['p2_name'] = "N/A" # Keeps DF shape consistent with 2D
+                ss_df['p2_name'] = np.nan
                 ss_df['p2_value'] = np.nan
                 ss_df['perturbation'] = perb
                 ss_df['exp_name'] = exp_name
@@ -141,27 +155,32 @@ def run_2d_sweep_single(base_model, exp, perb_config, param_values):
 # --------------------------------------------------
 # Full Combined Param Sweep
 # --------------------------------------------------
-def run_sweeps(base_model, result_dir, sweep_config, sim_config, target_exp=None):
+def run_sweeps(base_model, sweep_cfg, sim_cfg, target_exp=None, target_type=None, result_dir=None, ):
     """
     Orchestrates the running of experiments. 
     If target_experiments are provided (list), only those experiment runs.
     """
-    perb_config = sim_config['perturbations']
-    all_exps = sweep_config['experiments']
-    #exp_2d_cfg = sweep_config['2D_experiments']
+    perb_config = sim_cfg['perturbations']
+    all_exps = sweep_cfg['experiments']
 
-    # Filter if we only want one specific run
+    # Filter by name
     if target_exp:
         all_exps = [e for e in all_exps if e['name'] in target_exp]
-        if not all_exps:
-            print(f"ERROR: One of {target_exp} not found in config.")
-            return
+
+    # Filter by type (1D or 2D)
+    if target_type:
+        all_exps = [e for e in all_exps if e['type'] == target_type]
+
+    if not all_exps:
+        print(f"ERROR: One of {target_exp} not found in config.")
+        return
         
     sweep_results = []
+
     for exp in all_exps:
         # Determine resolution from config
         res_type = exp['resolution']
-        param_values = build_ranges(sweep_config, resolution=res_type)
+        param_values = build_ranges(sweep_cfg, resolution=res_type)
 
         print(f"\n>>> DEBUG: Initialising: {exp['name']} ({exp['type']})")
 
@@ -177,19 +196,24 @@ def run_sweeps(base_model, result_dir, sweep_config, sim_config, target_exp=None
 
             # Post-processing (Delta & Phenotype)
             df['type'] = exp['type']
-            df['delta'] = compute_delta(df, sim_config)
-            df['phenotype'] = df['delta'].apply(lambda x: classify_phenotype(x, sim_config))
+            df['delta'] = compute_delta(df, sim_cfg)
+            df['phenotype'] = df['delta'].apply(lambda x: classify_phenotype(x, sim_cfg))
             sweep_results.append(df)
-            
-            # Save individual experiment result
-            #save_df_to_csv(df, result_dir, f"{exp['type']}_{exp['name']}")
-            #print(f">>> DEBUG: {exp['name']} successfully saved to {result_dir}")
 
         except Exception as e:
             print(f"ERROR: Failed experiment {exp['name']}: {str(e)}")
 
+    if not sweep_results:
+        print("No experiments were executed.")
+        return
+
     full_sweep_df = pd.concat(sweep_results)
-    save_df_to_csv(full_sweep_df, result_dir, f"param_sweep_full")
+
+    # Save DataFrame as csv is result directory is provided
+    if result_dir is not None: 
+        filename = get_filename(target_exp, target_type)
+        save_df_to_csv(full_sweep_df, result_dir, filename)
+
     print(f"DEBUG: Combined parameter sweep experiment data saved to {result_dir}")
 
     return full_sweep_df

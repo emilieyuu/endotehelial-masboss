@@ -2,17 +2,10 @@
 experiment: "perturbation_simulation"
 
 # Path Configuration
-# Paths are relative to the PROJECT_ROOT
-paths:
-  model_bnd: "data/models/rho.bnd"
-  model_cfg: "data/models/rho_v3.cfg"
-  results_base: "results/boolean_models"
-  figures_base: "figures/boolean_models"
-  subdirs:
-    param_sweep: "param_sweep"
-    perturbation_sim: "perturbation_sim"
-    perturbation_figs: "perturbation_figs"
-    param_sweep_figs: "param_sweep_figs"
+model:
+  bnd: "models/rho.bnd"
+  cfg_v3: "models/rho_v3.cfg"
+
   
 
 # Analysis Settings
