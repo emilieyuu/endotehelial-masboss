@@ -6,7 +6,10 @@ model:
   bnd: "models/rho.bnd"
   cfg_v3: "models/rho_v3.cfg"
 
-  
+# Sim Settings
+sim_settings: 
+  max_time: 10.0
+  sample_count: 5000
 
 # Analysis Settings
 analysis:
