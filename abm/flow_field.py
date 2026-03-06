@@ -9,8 +9,8 @@ import numpy as np
 class FlowField(): 
 
     def __init__(self, shear_rate=1.0, direction=np.array([1.0, 0.0])): 
-        self.shear_rate = shear_rate
-        self.direction = direction
+        self.shear_rate = shear_rate # Shear stress magnitude
+        self.direction = direction # Flow direction
 
     def classify_faces(self, positions):
         """
@@ -21,20 +21,26 @@ class FlowField():
         centre = positions.mean(axis=0)
         relative = positions - centre # get vectors from centre to each node
 
+        # Normal vectors
         norms = np.linalg.norm(relative, axis=1, keepdims=True) # compute vector length
         outward_normals = relative / (norms + 1e-10) # divide by norm to produce unit vectors 
+        
+        # Alignment (-1 = Upstream, 1 = Downstream)
+        alignment = outward_normals @ self.direction # dot product
 
-        alignment = outward_normals @ self.direction # compare normals with flow direction using dot product
-
-        face_types = np.where(alignment > 0.5, 'upstream', 
-                              np.where(alignment < -0.5, 'downstream'), 
-                              'lateral') # face classification threshold: 
-                                         # ±0.5 dot product (60 degree cone)
+        # Classify 
+        face_types = np.where(alignment < -0.5, 'upstream', 
+                     np.where(alignment > 0.5, 'downstream'), 
+                     'lateral')
         
         return face_types, outward_normals
     
     def get_shear_at_node(self, outward_normal):
-        """ Shear force tangentally along membrane surface. """
+        # get shear force field instead?
+        """ 
+        Calculates shear magnitude
+        Shear force tangentally along membrane surface. 
+        """
 
         tangent = np.array([-outward_normal[1], outward_normal[0]]) # compute tangent direction
                                                                     # Rotates normal 90 degrees
