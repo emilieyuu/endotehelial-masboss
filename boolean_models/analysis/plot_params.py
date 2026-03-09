@@ -40,13 +40,14 @@ def add_annotation(fig, x_start=0.1, y_start=0.05, y_space=0.025):
 #=======================
 # 1D Sweep Plot Functions
 #=======================
-def plot_param_panel(ax, data, param_name, eps, add_phenotype=False):
+def plot_param_panel(ax, data, param_name, eps=0.25, metric="delta"):
     """ 
     Plot 1D sensitivity curve for single parameter on provided axis.
+    param metric: String; delta or Rho activation probabilities
     """
     # Line plot grouped by perturbation.
     sns.lineplot(
-        data=data, x='p1_value', y='delta',
+        data=data, x='p1_value', y=metric,
         hue='perturbation', style='perturbation',
         markers=True, dashes=False,
         ax=ax, legend='brief'
@@ -62,29 +63,35 @@ def plot_param_panel(ax, data, param_name, eps, add_phenotype=False):
         leg.set_bbox_to_anchor((1.02, 1))
         leg.set_frame_on(False)
 
-    # Add phenotype shading as horizontal bands
-    ax.axhspan(eps, 1.0, color='blue', alpha=0.1)
-    ax.axhspan(-eps, eps, color='gray', alpha=0.1)
-    ax.axhspan(-1.0, -eps, color='red', alpha=0.1)
+    if metric == 'delta':
+        # Add phenotype shading as horizontal bands
+        ax.axhspan(eps, 1.0, color='blue', alpha=0.1)
+        ax.axhspan(-eps, eps, color='gray', alpha=0.1)
+        ax.axhspan(-1.0, -eps, color='red', alpha=0.1)
 
-    ax.text(0.95, 0.85, "Hyper", transform=ax.transAxes, ha="center", color='blue', fontsize=8)
-    ax.text(0.95, 0.47, "Normal", transform=ax.transAxes, ha="center", color='dimgray', fontsize=8)
-    ax.text(0.95, 0.10, "Failed", transform=ax.transAxes, ha="center", color='red', fontsize=8)
+        ax.text(0.95, 0.85, "Hyper", transform=ax.transAxes, ha="center", color='blue', fontsize=8)
+        ax.text(0.95, 0.47, "Normal", transform=ax.transAxes, ha="center", color='dimgray', fontsize=8)
+        ax.text(0.95, 0.10, "Failed", transform=ax.transAxes, ha="center", color='red', fontsize=8)
 
     # Formatting
     ax.set_xlabel(param_name)
-    ax.set_ylabel("Balance ($\\Delta = RhoC - RhoA$)")
-    ax.set_ylim(-0.8, 0.8)
+    if metric == "delta": 
+        ax.set_ylabel("Balance ($\\Delta = RhoC - RhoA$)")
+        ax.set_ylim(-0.8, 0.8)
+    else:
+        ax.set_ylabel(f"Activation Probability ({metric})")
+        ax.set_ylin(0, 1)
+
     ax.set_xlim(left=0)
     ax.axhline(0, color='black', linestyle='--', linewidth=0.8)
 
-def plot_1d(df_1d, title=None, eps=0.25, group=None, outdir=None):
+def plot_1d(df_1d, metric='delta', title=None, eps=0.25, group=None, outdir=None):
 
     fig, axes = create_subplot_layout(len(group), title=title)
 
     for ax, p in zip(axes, group):
         data = df_1d[df_1d['p1_name'] == p]
-        plot_param_panel(ax, data, p, eps)
+        plot_param_panel(ax, data, p, eps, metric)
 
     plt.tight_layout(rect=[0, 0.05, 1, 1])
 

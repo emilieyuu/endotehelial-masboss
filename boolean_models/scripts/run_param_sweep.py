@@ -19,13 +19,14 @@ def build_ranges(sweep_config, resolution="fine"):
     ranges = sweep_config['ranges']
     groups = sweep_config['groups']
 
+    rho_groups = groups["rhos"]
+    junction_groups = groups["junctions"]
+
     # Initiate list to store parameter and values
     param_dict = {}
 
     for group in groups:
         for p, info in ranges.items(): 
-            # Construct parameter name
-            p_name = f"${group}_{p}"
 
             # Determine the step size based on resolution
             step = info['step']
@@ -34,7 +35,18 @@ def build_ranges(sweep_config, resolution="fine"):
 
             # Generate values
             values = np.arange(info['start'], info['stop'], step)
-            param_dict[p_name] = values
+
+            # Recruitment only for junction proteins
+            if p == "recruitment":
+                for group in junction_groups:
+                    p_name = f"${group}_{p}"
+                    param_dict[p_name] = values
+
+            # All other parameters only for rhos
+            else:
+                for group in rho_groups:
+                    p_name = f"${group}_{p}"
+                    param_dict[p_name] = values
             
     return param_dict
 
@@ -44,7 +56,8 @@ def get_filename(target_exp, target_type):
     if target_type and not target_exp: # 1D or 2D
         filename = f"param_sweep_{target_type}"
     elif target_exp and n_exps == 1: # One experiment only
-        filename = f"param_sweep_{target_exp[0]}"
+        exp_name = target_exp[0]['name']
+        filename = f"param_sweep_{exp_name}"
     elif target_exp and n_exps > 1: # Multple experiments
         filename = f"param_sweep_{n_exps}_selected_experiments"
     else:
@@ -155,7 +168,7 @@ def run_2d_sweep_single(base_model, exp, perb_config, param_values):
 # --------------------------------------------------
 # Full Combined Param Sweep
 # --------------------------------------------------
-def run_sweeps(base_model, sweep_cfg, sim_cfg, target_exp=None, target_type=None, result_dir=None, ):
+def run_sweeps(base_model, sweep_cfg, sim_cfg, target_exp=None, target_type=None, result_dir=None):
     """
     Orchestrates the running of experiments. 
     If target_experiments are provided (list), only those experiment runs.
@@ -211,7 +224,7 @@ def run_sweeps(base_model, sweep_cfg, sim_cfg, target_exp=None, target_type=None
 
     # Save DataFrame as csv is result directory is provided
     if result_dir is not None: 
-        filename = get_filename(target_exp, target_type)
+        filename = get_filename(all_exps, target_type)
         save_df_to_csv(full_sweep_df, result_dir, filename)
 
     print(f"DEBUG: Combined parameter sweep experiment data saved to {result_dir}")

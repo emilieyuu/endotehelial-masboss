@@ -1,0 +1,35 @@
+// rho_v2.bnd
+// Rho-Junction Model Version 2: 
+// Adjustment: Junction proteins represented by recruitment probability. 
+
+// --- Input Nodes (Y): Env. Controls ---
+node DSP {
+    rate_up = $DSP_recruitment;
+    rate_down = $DSP_decruitment; 
+}
+
+node TJP1 {
+    rate_up = $TJP1_recruitment;
+    rate_down = $TJP1_decruitment;
+}
+
+node JCAD {
+    rate_up = $JCAD_recruitment;
+    rate_down = $JCAD_decruitment;
+}
+
+
+// --- Inner Components (X): Molecular Switches ---
+node RhoA {
+    rate_up = (DSP & JCAD) ? $RhoA_amp : 
+              (DSP ? $RhoA_mod : 
+              $RhoA_basal);
+    rate_down = RhoC ? $RhoA_antagonistic : $RhoA_decay;
+}
+
+node RhoC {
+    rate_up = (TJP1 & JCAD) ? $RhoC_amp : 
+              (TJP1 ? $RhoC_mod : 
+              $RhoC_basal);
+    rate_down = RhoA ? $RhoC_antagonistic : $RhoC_decay;
+}

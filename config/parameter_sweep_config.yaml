@@ -7,18 +7,18 @@ ranges:
   basal:        { start: 0.0, stop: 1.5, step: 0.2 }
   antagonistic: { start: 0.0, stop: 16.0, step: 1.0 }
   decay:        { start: 0.0, stop: 1.1, step: 0.1 }
+  recruitment:  { start: 0.0, stop: 1.0, step: 0.05 }
 
-groups: ["RhoA", "RhoC"]
-
-1D_experiments: 
-  WT: "all"
-  DSP: ["$RhoC_antagonistic", "$RhoC_mod", "$RhoC_amp", "$RhoC_decay"]
-  TJP1: ["$RhoA_antagonistic", "$RhoA_mod", "$RhoA_amp", "$RhoA_decay"]
-  JCAD: ["$RhoA_mod", "$RhoC_mod", "$RhoA_basal", "$RhoC_basal"]
-  DSP_JCAD: ["$RhoC_mod", "$RhoC_basal", "$RhoA_basal"]
-  TJP1_JCAD: ["$RhoA_mod", "$RhoA_basal", "$RhoC_basal"]
+groups:
+  rhos: ["RhoA", "RhoC"]
+  junctions:  ["DSP", "TJP1", "JCAD"]
 
 experiments: 
+  - name: "Recruitment_Sweep"
+    perturbations: ["WT"]
+    type: "1D"
+    resolution: "fine"
+    parameters: ["$DSP_recruitment", "$TJP1_recruitment", "$JCAD_recruitment"]
   - name: "WT_Sweep"
     perturbations: ["WT"]
     type: "1D"
