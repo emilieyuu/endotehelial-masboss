@@ -8,8 +8,15 @@ import numpy as np
 
 class FlowField(): 
 
-    def __init__(self, shear_rate=1.0, direction=np.array([1.0, 0.0])): 
-        self.shear_rate = shear_rate # Shear stress magnitude
+    def __init__(self, shear_stress=1.0, direction=np.array([1.0, 0.0])): 
+        """
+        Initiate the flow field with global environmental parameters.
+
+        param shear_rate (float): Represent magnitude of flow as a scalar. 
+        param direction (np.array): Models unidirectional laminar flow. 
+            Initialised to move strictly from left to right along x-axis. 
+        """
+        self.shear_rate = shear_stress # Shear stress magnitude
         self.direction = direction # Flow direction
 
     def classify_faces(self, positions):
@@ -45,3 +52,4 @@ class FlowField():
         alignment = np.dot(self.direction, tangent) # measure alignment with flow 
 
         return self.shear_rate * abs(alignment) # shear magnitude
+            

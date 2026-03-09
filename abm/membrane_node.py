@@ -33,13 +33,15 @@ class MembraneNode():
 
         # LocalMechnical state
         self.local_force = np.ndarray(2) # F = k(L - L0), (cortical tension)
-        self.local_shear = 0.0 # local shear from flow
         self.tension = 0.0 # tension in adjacent springs
+
+        # flow-related mechanics
+        self.local_shear = 0.0 # local shear from flow
         self.face_type = 'lateral' # change to normal vector instead?
 
         # Cytoskeletal state
-        self.contractility
-        self.sf_alignment
+        # self.contractility
+        # self.sf_alignment
 
     
 

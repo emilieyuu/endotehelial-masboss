@@ -18,25 +18,31 @@ class EndothelialCell:
         # Global cell properties
         self.centroid = centroid # [X, Y] coordinates represnting centre of cell
         self.target_area = np.pi * radius**2 # area constraint (incompressible cytoplasm)
-
-        # Create nodes evenly spaces around circle
-        angles = np.linspace(0, 2*np.pi, n_nodes, endpoint=False)
-            # Generate n_nodes evenly spaced numbers between 0 and 2pi radians (circle)
-            
-        self.positions = np.column_stack([
-            centroid[0] + radius * np.cos(angles),
-            centroid[1] + radius * np.sin(angles)
-        ])
-            # Converts angles to coordinates using parametric equation of circle
-            # np.column_stack: joins x and y coordinates into pairs (cols of x, y coordinates)
+         
+        self.positions, self.nodes = self._init_node_ring(centroid, n_nodes, radius)
 
         # Initial resting length of springs between nodes
         self.rest_length = 2 * radius * np.sin(np.pi / n_nodes)
     
 
+    def _init_node_ring(self, centroid, n_nodes, radius):
+        # Global cell properties
+        angles = np.linspace(0, 2*np.pi, n_nodes, endpoint=False) # Generate n_nodes evenly spaced numbers between 0 and 2pi radians (circle)   
+
+        # Create nodes evenly spaces around circle         
+        positions = np.column_stack([
+            centroid[0] + radius * np.cos(angles), # Converts angles to coordinates using parametric equation of circle
+            centroid[1] + radius * np.sin(angles) # np.column_stack: joins x and y coordinates into pairs (cols of x, y coordinates)
+        ])
+        
+        # Initiate n nodes using calculated positions
+        nodes = [MembraneNode(i, pos) for i, pos in enumerate(positions)] 
+
+        return positions, nodes
+
     def get_pairs(self):
         """ Return adjacent node pairs. """
-        pass
+        return [(self.nodes[i], self.nodes[(i+1) % self.n_nodes]) for i in range(self.n_nodes)]
 
     def compute_spring_forces(self):
         """ 
