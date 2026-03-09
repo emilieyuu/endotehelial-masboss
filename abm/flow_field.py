@@ -30,18 +30,16 @@ class FlowField():
 
         # Classify 
         face_types = np.where(alignment < -0.5, 'upstream', 
-                     np.where(alignment > 0.5, 'downstream'), 
-                     'lateral')
+                     np.where(alignment > 0.5, 'downstream',
+                    'lateral'))
         
         return face_types, outward_normals
     
     def get_shear_at_node(self, outward_normal):
-        # get shear force field instead?
         """ 
-        Calculates shear magnitude
+        Calculates shear magnitude.
         Shear force tangentally along membrane surface. 
         """
-
         tangent = np.array([-outward_normal[1], outward_normal[0]]) # compute tangent direction
                                                                     # Rotates normal 90 degrees
         alignment = np.dot(self.direction, tangent) # measure alignment with flow 
