@@ -1,5 +1,11 @@
 # Config for spatial model aspects
 
+# Lookup Table Configuration
+files: 
+  recruitment_csv: "param_sweep_Recruitment_Sweep.csv"
+
+recruitment_var_maps: {'$DSP_recruitment': 'p_dsp', '$TJP1_recruitment': 'p_tjp1', '$JCAD_recruitment': 'p_jcad'}
+
 # Protein-Specifc Hill Parameters
 hill_params: 
   # K: Activation Threshold: Tension level where junction is stressed enough to signal
