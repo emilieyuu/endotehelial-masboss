@@ -1,7 +1,7 @@
 # abm/junction_node.py
 #
 # A MembraneNode is the unit making up the cell membrane.
-# Nodes are connected to each other by a Spring – this forms the internal actin cortex. 
+# Adjacent nodes are connected to each other by a Spring.
 # A MembraneNode 
 
 import numpy as np
@@ -15,73 +15,88 @@ class MembraneNode():
         # ID, position
         self.id = node_id
         self.pos = np.array(position, dtype=float)
+        self.force = np.zeros(2)
 
-        # Geometry: Set by flow field
-        self.outward_normal = np.zeros(2)
-        self.tangent = np.zeros(2)
-        self.face_type = 'lateral' # iniated to lateral, modified dependeing on flow
+    def apply_force(self, force):
+        """
+        All forces applied to node (flow + springs)
+        """
+        self.force += force
 
-        # Mechanical inputs from flow
-        self.shear = 0.0
-        self.normal_force = 0.0
-        self.flow_force = np.zeros(2) # combined flow vector for mechanics
-        self.tension = 0.0 # spring tension, set by Cell
+    def update(self, dt=0.1, gamma=0.1):
+        """
+        Overdamped Update: dx = (F / gamma) * dt
+        gamma: viscous drag coefficient (damping)
+        """
 
+        displacement = (self.force / gamma) * dt
 
-        # Junction protein states, 0 at init, not yet mechanically activated
-        self.DSP, self.TJP1, self.JCAD = 0, 0, 0
+        self.pos += displacement
+        self.force = np.zeros(2) # reset for next time step
 
-        # Rho activity (derived from MaBoSS)
-        self.P_RhoA, self.P_RhoC = 0.0, 0.0
+        # # Geometry: Set by flow field
+        # self.outward_normal = np.zeros(2)
+        # self.tangent = np.zeros(2)
+        # self.face_type = 'lateral' # iniated to lateral, modified dependeing on flow
+
+        # # Mechanical inputs from flow
+        # self.shear = 0.0
+        # self.normal_force = 0.0
+        # self.flow_force = np.zeros(2) # combined flow vector for mechanics
      
-        # Cytoskeletal state
-        self.contractility = 0.0
-        self.sf_alignment = 0.0
+        # # Cytoskeletal state
+        # self.contractility = 0.0
+        # self.sf_alignment = 0.0
 
-    def update_state_from_flow(self, shear: float, normal_force:float, outward_normal: np.ndarray, 
-                         face_type: str, tangent: np.ndarray, flow_force: np.ndarray):
-        """
-        Write flow field output onto node. 
-        """
-        self.shear = shear
-        self.normal_force = normal_force
-        self.outward_normal = np.array(outward_normal)
-        self.face_type = face_type
-        self.tangent = np.array(tangent)
-        self.flow_force = np.array(flow_force)
+    # def update_state_from_flow(self, shear: float, normal_force:float, outward_normal: np.ndarray, 
+    #                      face_type: str, tangent: np.ndarray, flow_force: np.ndarray):
+    #     """
+    #     Write flow field output onto node. 
+    #     """
+    #     self.shear = shear
+    #     self.normal_force = normal_force
+    #     self.outward_normal = np.array(outward_normal)
+    #     self.face_type = face_type
+    #     self.tangent = np.array(tangent)
+    #     self.flow_force = np.array(flow_force)
 
-    def update_protein_states(self, force_threshold_tensile=0.3, force_threshold_compress=0.1):
-        """
-        Concert local mechanical state into boolean protein activation 
-        """
-        #Set parameters based on flow here
+    # def update_cytoskeleton(self, P_RhoA: float, P_RhoC: float,
+    #                          dt: float,
+    #                          tau_contractility: float = 5.0,
+    #                          tau_sf: float = 20.0):
+    #     """
+    #     Cytoskeletal state relaxes toward Rho-determined targets.
 
-    def update_rho_activity(self): 
-        # Run MaBoSS directly or call external function to run maboss and get result
-        self.P_RhoA = 0.0 # Some updated value
-        self.P_RhoC = 0.0 # Some updated value
-        pass
+    #     P_RhoA, P_RhoC : averaged from this node's two adjacent springs
+    #     dt             : timestep size
 
-    def get_spring_stiffmess(self): 
-        """
-        RhoA increases cortical tension -> stiffer springs
-        """
-        # *spring stiffness as a function of P(RhoA)
+    #     First-order kinetics:
+    #         contractility: fast  (tau~5)  — ROCK/MLC phosphorylation
+    #         sf_alignment:  slow  (tau~20) — mDia2/actin polymerisation
 
-    def get_orientation(self):
-        """
-        Rho drives stress fibre alignement to flow
-        return bias angle (0 = aligned with flow)
-        """ 
-        # high RhoC = strong pull towards flow
-        # Low RhoC = orientation is free/random
-        pass
+    #     Timescale difference produces the observed behaviour:
+    #     cells first change tension (fast) then gradually align stress
+    #     fibres (slow) — consistent with elongation over 24h (Noria 2004).
+    #     """
+    #     self.contractility += dt * (P_RhoA - self.contractility) \
+    #                           / tau_contractility
+    #     self.sf_alignment  += dt * (P_RhoC - self.sf_alignment) \
+    #                           / tau_sf
 
     def __repr__(self):
         return (f"MembraneNode(id={self.id} | "
                 f"pos={self.pos.round(2)} | "
-                f"face={self.face_type} | "
-                f"shear={self.shear:.3f} | "
-                f"normal_force={self.normal_force:.3f} | "
-                f"flow_force={self.flow_force.round(3)})")
+                f"force={self.force}")
+
+    # def __str__(self):
+    #     return (f"MembraneNode(id={self.id} | "
+    #             f"pos={self.pos.round(2)} | "
+    #             f"normal={self.outward_normal.round(3)} | "
+    #             f"face={self.face_type} | "
+    #             f"flow_force={self.flow_force.round(3)} | "
+    #             f"contractility={self.contractility:.3f} | "
+    #             f"sf_alignment={self.sf_alignment:.3f})")
+    
+  
+
 

@@ -1,31 +1,34 @@
 # abm/endothelial_cell.py
 # 
-# A closed ring of membrane nodes representing the cell cortex in 2D
+# A closed ring of membrane nodes representing the cell cortex in 2D.
+# The orchestrator connecting springs to nodes. 
 #
 
 import numpy as np
 from abm.membrane_node import MembraneNode
+from abm.spring import Spring
 
 class EndothelialCell: 
     """
     Cells are represented as ring of membrane nodes connected by springs. 
     """
-    def __init__(self, cell_id: int, centroid: np.ndarray, 
-                 n_nodes: int = 12, radius: float = 10.0):
+    def __init__(self, cell_id: int, centroid: np.ndarray, n_nodes: int = 12, radius: float = 10.0, 
+                 k_base: float = 1.0, damping: float = 1.0):
         
         self.id = cell_id
         self.n_nodes = n_nodes
 
-        # Area constraint — incompressible cytoplasm
-        self.target_area = np.pi * radius**2 # area constraint (incompressible cytoplasm)
-         
-        # Initial resting length of springs between nodes
-        self.rest_length = 2 * radius * np.sin(np.pi / n_nodes)
+        # Cell geometry 
+        self.target_area = np.pi * radius**2 # area constraint — incompressible cytoplasm
+        self.rest_length = 2 * radius * np.sin(np.pi / n_nodes) # initial resting length of springs between nodes
 
-        # Initae node ring
+        # Initialise node ring and springs
         self.nodes = self._init_node_ring(centroid, n_nodes, radius)
+        self.springs = self._init_springs(n_nodes, k_base)
     
-
+    # ------------------------------------------------------------------
+    # Initialisation
+    # ------------------------------------------------------------------
     def _init_node_ring(self, centroid, n_nodes, radius):
         # Global cell properties
         angles = np.linspace(0, 2*np.pi, n_nodes, endpoint=False) # Generate n_nodes evenly spaced numbers between 0 and 2pi radians (circle)   
@@ -40,9 +43,20 @@ class EndothelialCell:
 
         return nodes
     
-    # ----
-    # Positions
-    # ----
+    def _init_springs(self, n_nodes, k_base):
+        springs = []
+
+        for i in range(n_nodes):
+            node_1 = self.nodes[i]
+            node_2 = self.nodes[(i + 1) % n_nodes]
+
+            springs.append(Spring(node_1, node_2, self.rest_length, k_base))
+
+        return springs
+        
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
     @property
     def positions(self) -> np.ndarray:
         return np.array([n.pos for n in self.nodes])
@@ -52,17 +66,31 @@ class EndothelialCell:
         return self.positions.mean(axis=0)
     
     # ----
-    # Topology
+    # Getters
     # ----
 
     def get_pairs(self):
         """ Return adjacent node pairs. """
         return [(self.nodes[i], self.nodes[(i+1) % self.n_nodes]) for i in range(self.n_nodes)]
     
-    # ----
-    # Shape measurement
-    # ----
+    # ------------------------------------------------------------------
+    # Forces
+    # ------------------------------------------------------------------
+    def compute_spring_force(self):
+        pass
 
+    def compute_pressure_forces(self):
+        pass
+    
+    # ------------------------------------------------------------------
+    # Timestep
+    # ------------------------------------------------------------------
+    def step(self):
+        pass
+
+    # ------------------------------------------------------------------
+    # Measurements
+    # ------------------------------------------------------------------
     def measure_shape(self) -> dict:
         """
         PCA on node positions — same metrics as ImageJ/FIJI output.
@@ -104,19 +132,4 @@ class EndothelialCell:
                 f"centroid={c} | "
                 f"rest_length={self.rest_length:.3f})")
 
-    def compute_spring_forces(self):
-        """ 
-        Compute spring forces on each node from its 2 neighbours, 
-        modulated by local RhoA actvity
-        """
-
-    def compute_pressure_forces(self):
-        pass
-
-    def step_mechanics():
-        pass
-
-    def measure_shape(self):
-        """
-        Compute aspect ratio and orientation angle of the cell. 
-        """
+    
