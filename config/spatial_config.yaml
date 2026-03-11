@@ -2,15 +2,17 @@
 
 # Protein-Specifc Hill Parameters
 hill_params: 
-  # K: Half-activation shear
+  # K: Activation Threshold: Tension level where junction is stressed enough to signal
   # n: Cooperativity
-  JCAD: {K: 0.4, n: 2}
-  DSP: {K: 0.3, n: 2}
-  TJP1: {K: 0.3, n: 2}
+  JCAD: {K: 1.5, n: 3}
+  DSP: {K: 1.5, n: 3}
+  TJP1: {K: 1.5, n: 3}
 
-# Protein-Specific Face bias, scales affective shear by face
-face_bias:
-  JCAD: {lateral: 1.0, upstream: 0.7, downstream: 0.3} # Recruits well under tension
-  DSP: {lateral: 1.0, upstream: 0.2, downstream: 0.1} # Primarily tensile force
-  TJP1: {lateral: 0.4, upstream: 1.0, downstream: 0.2} # Responds to upstream loading
+# Rho to Mechanics Mapping Constants
+meachanics: 
+  k_base: 1.0
+  kc_ratio: 0.1         # Bilinear: 10% stiffness in compression
+  rhoa_k_mult: 4.0      # How much RhoA stiffens the spring
+  rhoa_l_shrink: 0.5    # How much RhoA contracts the rest length (failed elongation)
+  rhoc_l_shrink: 0.4    # RhoC-driven contraction (hyper elongation)
   

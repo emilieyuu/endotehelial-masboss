@@ -3,10 +3,10 @@ experiment: "perturbation_simulation"
 
 # Path Configuration
 model:
-  bnd_v1: "models/rho.bnd"
-  bnd_v2: "models/rho_v2.bnd"
-  cfg_v3: "models/rho_v3.cfg"
-  cfg_v4: "models/rho_v4.cfg"
+  bnd_v1: "maboss_models/rho.bnd"
+  bnd_v2: "maboss_models/rho_v2.bnd"
+  cfg_v3: "maboss_models/rho_v3.cfg"
+  cfg_v4: "maboss_models/rho_v4.cfg"
 
 
 # Sim Settings
