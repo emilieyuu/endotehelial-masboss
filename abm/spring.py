@@ -117,19 +117,26 @@ class Spring:
         spring_cfg = self.cfg['mechanics']
         tau = spring_cfg['tau_remodel'] # constant time for remodelling
 
+        # How much Rho is active ABOVE the resting competition baseline
+        # Contract if Rho is above resting level
+        rhoA_rest = self.lut.rhoA_rest
+        rhoC_rest = self.lut.rhoC_rest
+        delta_rhoA = max(self.P_RhoA - rhoA_rest, 0.0)
+        delta_rhoC = max(self.P_RhoC - rhoC_rest, 0.0)
+
         # Calculate target (Where spring wants to be)
         # RhoA stiffens, RhoC + alignment thins the cell
-        k_target = self.k_base * (1.0 + spring_cfg['rhoa_k_gain'] * self.P_RhoA)
+        k_target = self.k_base * (1.0 + spring_cfg['rhoa_k_gain'] * delta_rhoA)
         print(f"k_target: {k_target}")
 
         # L_target shrings with RhoA and RhoC * alignment (lateral thinning)
-        l_shrink_rhoa = spring_cfg['rhoa_l_shrink'] * self.P_RhoA
-        l_shrink_rhoc = spring_cfg['rhoc_l_shrink'] * self.P_RhoC * self.alignment
+        l_shrink_rhoa = spring_cfg['rhoa_l_shrink'] * delta_rhoA
+        l_shrink_rhoc = spring_cfg['rhoc_l_shrink'] * delta_rhoC * self.alignment
         print(f"l_shrink_rhoa: {l_shrink_rhoa}, l_shrink_rhoc: {l_shrink_rhoc}")
 
         L_target = self.L_rest * (1.0 - l_shrink_rhoa - l_shrink_rhoc)
         L_target = max(L_target, self.L_rest * 0.4) # Physical limit
-        print("L_target: {L_target}")
+        print(f"L_target: {L_target}")
 
         # Relax toward targets (First-order lag)
         alpha = dt / tau

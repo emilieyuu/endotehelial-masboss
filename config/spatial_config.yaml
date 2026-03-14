@@ -2,10 +2,24 @@
 
 # Lookup Table Configuration
 files: 
-  recruitment_csv: "param_sweep_Recruitment_Sweep.csv"
+  recruitment_csv: "param_sweep_Joint_Recr_Sweep.csv"
 
-recruitment_var_maps: {'$DSP_recruitment': 'p_dsp', '$TJP1_recruitment': 'p_tjp1', '$JCAD_recruitment': 'p_jcad'}
+sim: 
+  dt: 0.1
+  gamma: 1.0 # viscuous drag (higher ≈ slower movement)
 
+
+# Parameter for tension calculation
+mechanics:
+  k_area: 0.8 # Area conservation stiffness
+  k_spring: 1.0 # Permanent / Basal stiffness of springs (actin filaments)
+
+  tau_remodel: 20.0 # Relaxation time
+  rhoa_k_gain: 3.0 # How much RhoA stiffens cortex
+  rhoa_l_shrink: 0.2 # General Contraction from RhoA
+  rhoc_l_shrink: 0.5 # General contraction from RhoC
+  kc_ratio: 0.1 # Bilinear: 10% stiffness in compression
+ 
 # Protein-Specifc Hill Parameters
 hill_params: 
   # K: Activation Threshold: Tension level where junction is stressed enough to signal
@@ -13,12 +27,4 @@ hill_params:
   JCAD: {K: 1.5, n: 3}
   DSP: {K: 1.5, n: 3}
   TJP1: {K: 1.5, n: 3}
-
-# Rho to Mechanics Mapping Constants
-meachanics: 
-  k_base: 1.0
-  kc_ratio: 0.1         # Bilinear: 10% stiffness in compression
-  rhoa_k_mult: 4.0      # How much RhoA stiffens the spring
-  rhoa_l_shrink: 0.5    # How much RhoA contracts the rest length (failed elongation)
-  rhoc_l_shrink: 0.4    # RhoC-driven contraction (hyper elongation)
   

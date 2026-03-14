@@ -7,7 +7,7 @@ ranges:
   basal:        { start: 0.0, stop: 1.5, step: 0.2 }
   antagonistic: { start: 0.0, stop: 16.0, step: 1.0 }
   decay:        { start: 0.0, stop: 1.1, step: 0.1 }
-  recruitment:  { start: 0.0, stop: 1.0, step: 0.05 }
+  recruitment:  { start: 0.0, stop: 1.1, step: 0.1 }
 
 groups:
   rhos: ["RhoA", "RhoC"]
@@ -84,3 +84,8 @@ experiments:
     type: "2D"
     resolution: "coarse"
     parameters: ["$RhoA_basal", "$RhoC_basal"]
+  - name: "Joint_Recr_Sweep"
+    perturbations: ["WT"]
+    type: "3D"
+    resolution: "coarse"
+    parameters: ["$DSP_recruitment", "$TJP1_recruitment", "$JCAD_recruitment"]

@@ -18,11 +18,8 @@ def build_ranges(sweep_config, resolution="fine"):
     # Extract group, range and step info
     ranges = sweep_config['ranges']
     groups = sweep_config['groups']
-
     rho_groups = groups["rhos"]
     junction_groups = groups["junctions"]
-
-    # Initiate list to store parameter and values
     param_dict = {}
 
     for group in groups:
@@ -165,6 +162,49 @@ def run_2d_sweep_single(base_model, exp, perb_config, param_values):
 
     return pd.concat(results)
 
+def run_3d_sweep_single(base_model, exp, perb_config, param_values):
+    """
+    Run a 3D joint sweep, returning a combined DataFrame with results.
+    Used for joint recruitment sweeps where all three proteins vary simultaneously.
+    """
+    results = []
+    exp_name = exp['name']
+    perbs    = exp['perturbations']
+    p1, p2, p3 = exp['parameters']
+
+    for perb in perbs:
+        print(f"DEBUG: Starting {exp_name} sweep for perturbation: {perb}")
+        perb_model = generate_ko_model(base_model, perb_config[perb])
+
+        v1_list = param_values[p1]
+        v2_list = param_values[p2]
+        v3_list = param_values[p3]
+
+        total = len(v1_list) * len(v2_list) * len(v3_list)
+        print(f"DEBUG: {total} combinations — {p1}×{p2}×{p3}")
+
+        for i, (v1, v2, v3) in enumerate(itertools.product(v1_list, v2_list, v3_list)):
+            m_temp = perb_model.copy()
+            m_temp.update_parameters(**{p1: v1, p2: v2, p3: v3})
+
+            res   = m_temp.run()
+            ss_df = res.get_last_nodes_probtraj()
+
+            ss_df['p1_name'],  ss_df['p1_value']  = p1, v1
+            ss_df['p2_name'],  ss_df['p2_value']  = p2, v2
+            ss_df['p3_name'],  ss_df['p3_value']  = p3, v3
+            ss_df['perturbation'] = perb
+            ss_df['exp_name']     = exp_name
+
+            results.append(ss_df)
+
+            if i % 100 == 0:
+                print(f"  {i}/{total} done")
+
+        print(f"DEBUG: Completed {exp_name} for perturbation: {perb}")
+
+    return pd.concat(results)
+
 # --------------------------------------------------
 # Full Combined Param Sweep
 # --------------------------------------------------
@@ -203,6 +243,8 @@ def run_sweeps(base_model, sweep_cfg, sim_cfg, target_exp=None, target_type=None
                 df = run_1d_sweep_single(base_model, exp, perb_config, param_values)
             elif exp['type'] == "2D":
                 df = run_2d_sweep_single(base_model, exp, perb_config, param_values)
+            elif exp['type'] == "3D":                                           
+                df = run_3d_sweep_single(base_model, exp, perb_config, param_values)
             else:
                 print(f"Unknown type {exp['type']} for {exp['name']}")
                 continue
