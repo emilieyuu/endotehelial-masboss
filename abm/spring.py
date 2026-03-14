@@ -12,44 +12,8 @@
 # 5. Differentiation between cortical/sf: k_cortical, L_cortical, L_sf
 
 import numpy as np
-###
-# Helpers
-###
-def hill(tau, K, n):
-    """
-    S: Sensitivity input (sheae nmagnitude / force)
-    K: Half activation thershold
-    n: Hill coefficiet
-    """
-    return tau**n / (K**n + tau**n)
+from abm.abm_helpers import hill, get_recruitment, calculate_bilinear_tension
 
-def get_recruitment(cfg, tau, protein):
-    """
-    Tension-Based Hill recruitment for protein. 
-    """
-    hill_params = cfg['hill_params'][protein]
-
-    K = hill_params['K']
-    n = hill_params['n']
-
-    return hill(tau, K ,n)
-
-def calculate_bilinear_tension(l, l0, kt, kc_ratio=0.1):
-    """
-    l: current_length
-    l0: rest_length
-    kt: tensile stiffness (from RhoA/RhoC mapping)
-    kc_ratio: 0.1 (compressive stiffness is 10% of tensile)
-    """
-
-    extension = l - l0 # current_length - rest_length
-    if extension > 0:
-        # Tension regime (Stretching) - gives positice tension
-        return kt * extension 
-    else:
-        # Compression regime (Squishing) - gives smaller restoring force (10% stiffness)
-        kc = kt * kc_ratio
-        return kc * extension # This will be a negative value (pushing force)
 
 ###
 # Spring Class
@@ -59,41 +23,46 @@ class Spring:
     Represents junction between two adjacent membrane nodes.
     """
 
-    def __init__(self, node_1, node_2, rest_length, k_base=1.0):
-        # Reference to MembraneNodes
+    def __init__(self, spring_id: int, node_1, node_2, 
+                 rest_length: float, lut, cfg, k_base=1.0):
+        
+        self.lut = lut # rho lookup table
+        self.cfg = cfg
+        
+        # Spring General Properties
+        self.id = spring_id
         self.node_1 = node_1
         self.node_2 = node_2
 
-        self.rest_length = rest_length # spring rest length
-        self.k_base = k_base # base constant for bilinear law calculations
+        # Spring Initial Mechanical (rest)
+        self.L_rest = rest_length # spring rest length
+        self.k_base = k_base # stiffness of actin filaments
 
-        # Spring Geometry
+        # Cortical Spring Mechanics (current)
+        self.L_cortical = rest_length
+        self.k_cortical = k_base # active stiffness at any moment (changes with RhoA)
+
+        # Spring Geometry – Recomputed at each step
         self.length = rest_length
         self.tension = 0.0 # follows bilinear law
         self.unit_vec = np.zeros(2) # unit vector, represent spring orientation (node_1 + node_2)
-        self.alignment = 0.0 # alignment of junction to flow
+        self.alignment = 0.0 # alignment of junction to flow (1 = parallel, 0 = perpendicular)
 
         # Junction Protein States
-        self.DSP, self.TJP1, self.JCAD = 0, 0, 0
+        self.DSP, self.TJP1, self.JCAD = 0.0, 0.0, 0.0
  
         # Rho Activation Proability
         self.P_RhoA, self.P_RhoC = 0.0, 0.0
 
-        # Cortical Spring Mechanics ( RhoA -> actomyosin -> stiffer )
-        self.k_cortical = k_base
-        self.L_cortical = rest_length
-
-        # # Stress Fibre Meachnics (RhoC -> stress fibres)
-        # self.k_sf = k_base * 2.0
-        # self.L_sf = rest_length
-
     
     def update_geometry(self, flow_direction):
         """
-        Compute length, extension, tension and flow alignment from current node positions. 
+        Recompute length, unit vector, flow alignment and tension. 
+
+        unit_vec points from node 1 to node 2
         """
         # Compute length of junction
-        diff = self.node_1.pos - self.node_2.pos
+        diff = self.node_2.pos - self.node_1.pos # unit vector point from node 1 to 2
         length = np.linalg.norm(diff)
 
         if length < 1e-10:
@@ -103,72 +72,93 @@ class Spring:
         self.length = length
         self.unit_vec = diff / self.length # calclate unit vector representation of junction
         self.alignment = abs(np.dot(self.unit_vec, flow_direction))
+        print(f""">>> DEBUG: Calcualted Geometry for Spring {self.id}
+              diff: {diff.round(2)} | length: {length.round(2)} | unit vect: {self.unit_vec.round(2)} | alignment: {self.alignment:.2f}""")
 
-        # Update spring tension ( Katie spring equation)
-        self.tension = calculate_bilinear_tension(self.length, self.rest_length, self.k_cortical)
+        # Update spring tension 
+        kc_ratio = self.cfg['mechanics']['kc_ratio']
+        self.tension = calculate_bilinear_tension(
+            self.length, self.L_cortical, 
+            self.k_cortical, kc_ratio)
 
-    def calculate_forces(self):
-        """
-        Calculates the force vector and applies it to the two connected nodes.
-        """
-        # The scalar tension (magnitude) was calculated in update_geometry
-        # We turn it into a vector. Tension > 0 pulls nodes together.
-        force_vec = self.tension * self.unit_vec
-        
-        # Apply equal and opposite forces
-        self.node_1.apply_force(-force_vec) # Pulling node 1 toward node 2
-        self.node_2.apply_force(force_vec)
     
-
-    def get_spring_mechanical_inputs(self):
+    def update_signalling(self, perturbation='WT'):
         """
-        Convert junction mechanical state to protein states. 
-
-        DSP: tensile tension × alignment (lateral junctions, parallel to flow, pulled apart by shear)
-        TJP1: tensile tension × (1 - alignment) (perpendicular junctions, upstream face, loaded by flow)
-        JCAD: tensile tension magnitude (scaffold at any loaded junction, regardless of orientation)
+        Convert mechanical state to Rho activity via Junction Proteins
         """
         tensile = max(self.tension, 0) 
+
         tau_dsp = tensile * self.alignment # senses shear drag on lateral junctions
         tau_tjp1 = tensile * (1 - self.alignment) # senses compression at upstream face
         tau_jcad = tensile # senses crowding at upstream face
 
-        print(f">>> DEBUG: Computed mechnical input tau_dsp: {tau_dsp}, tau_tjp1: {tau_tjp1}, tau_jcad: {tau_jcad}")
-        return tau_dsp, tau_tjp1, tau_jcad
-    
-    def update_signalling(self, cfg, perturbation='WT'):
-        """
-        Convert junction proteins to Rho activity.
-        """
-
-        tau_dsp, tau_tjp1, tau_jcad = self.get_spring_mechanical_inputs()
+        print(f">>> DEBUG: Computed mechnical input tau_dsp: {tau_dsp:.2f}, tau_tjp1: {tau_tjp1:.2f}, tau_jcad: {tau_jcad:.2f}")
 
         # Calculate Hill-based probabilities for protein recruitment 
-        p_dsp = get_recruitment(cfg, tau_dsp, 'DSP')
-        p_tjp1 = get_recruitment(cfg, tau_tjp1, 'TJP1')
-        p_jcad = get_recruitment(cfg, tau_jcad, 'JCAD')
+        self.DSP = get_recruitment(self.cfg, tau_dsp, 'DSP')
+        self.TJP1 = get_recruitment(self.cfg, tau_tjp1, 'TJP1')
+        self.JCAD = get_recruitment(self.cfg, tau_jcad, 'JCAD')
+        print(f""">>>INFO: Protein Recruitment for spring {self.id} is
+               DSP: {self.DSP}, TJP1: {self.TJP1}, JCAD: {self.JCAD}""")
 
         # Get RhoA / RhoC probabilities from Lookup table
-        # Get p_RhoA and p_RhoC from lookup table
-        return p_dsp, p_tjp1, p_jcad
+        self.P_RhoA, self.P_RhoC = self.lut.query(self.DSP, self.TJP1, self.JCAD)
+        print(f""">>>INFO: Rho Activation for sprinG {self.id} is 
+              RhoA: {self.P_RhoA:.2f}, RhoC: {self.P_RhoC:.2f}""")
 
-    def update_stiffness(self):
+
+    def update_stiffness(self, dt=0.1):
         """
         Translate Rho activity to mechanical spring parameters
 
         RhoA → contractility → cortical spring stiffer + shorter rest length
         RhoC → stress fibre prestretch → L_sf < rest_length
         """
+        spring_cfg = self.cfg['mechanics']
+        tau = spring_cfg['tau_remodel'] # constant time for remodelling
 
-        # Cortical spring — RhoA driven
-        self.k_cortical = self.k_base * (1.0 + 3.0 * self.P_RhoA)
-        self.L_cortical = self.rest_length * (1.0 - 0.4 * self.P_RhoA)
-        self.L_cortical = max(self.L_cortical, 0.3 * self.rest_length)
+        # Calculate target (Where spring wants to be)
+        # RhoA stiffens, RhoC + alignment thins the cell
+        k_target = self.k_base * (1.0 + spring_cfg['rhoa_k_gain'] * self.P_RhoA)
+        print(f"k_target: {k_target}")
+
+        # L_target shrings with RhoA and RhoC * alignment (lateral thinning)
+        l_shrink_rhoa = spring_cfg['rhoa_l_shrink'] * self.P_RhoA
+        l_shrink_rhoc = spring_cfg['rhoc_l_shrink'] * self.P_RhoC * self.alignment
+        print(f"l_shrink_rhoa: {l_shrink_rhoa}, l_shrink_rhoc: {l_shrink_rhoc}")
+
+        L_target = self.L_rest * (1.0 - l_shrink_rhoa - l_shrink_rhoc)
+        L_target = max(L_target, self.L_rest * 0.4) # Physical limit
+        print("L_target: {L_target}")
+
+        # Relax toward targets (First-order lag)
+        alpha = dt / tau
+        self.k_cortical += alpha * (k_target - self.k_cortical)
+        self.L_cortical += alpha * (L_target - self.L_cortical)
+        print(f"k_cortical: {self.k_cortical}, L_cortical: {self.L_cortical}")
+
+    def calculate_forces(self):
+        """
+        Calculates the force vector and applies it to the two connected nodes.
+        """
+        if self.length < 1e-10:
+            return
+        
+        f = calculate_bilinear_tension(self.length, self.L_cortical, self.k_cortical,
+                                    self.cfg['mechanics']['kc_ratio'])
+        
+        # The scalar tension (magnitude) was calculated in update_geometry
+        # We turn it into a vector. Tension > 0 pulls nodes together.
+        force_vec = f * self.unit_vec
+        
+        # Apply equal and opposite forces
+        self.node_1.apply_force(force_vec) # Pushes node 1 away from node 2
+        self.node_2.apply_force(-force_vec)
 
 
     def __repr__(self):
         return (f"Spring({self.node_1.id}→{self.node_2.id} | "
-                f"L={self.length:.3f} L0={self.rest_length:.3f} | "
+                f"L={self.length:.3f} L0={self.L_rest:.3f} | "
                 f"T={self.tension:.3f} align={self.alignment:.3f} | "
                 f"DSP={self.DSP} TJP1={self.TJP1} JCAD={self.JCAD} | "
                 f"RhoA={self.P_RhoA:.3f} RhoC={self.P_RhoC:.3f})")

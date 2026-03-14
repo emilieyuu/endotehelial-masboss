@@ -23,16 +23,18 @@ class MembraneNode():
         """
         self.force += force
 
-    def update(self, dt=0.1, gamma=0.1):
+    def update(self, dt=0.1, gamma=1.0):
         """
-        Overdamped Update: dx = (F / gamma) * dt
-        gamma: viscous drag coefficient (damping)
+        Overdampeddynamics update: dx = (F / gamma) * dt
+        gamma: viscous drag coefficient (thickness of envrionment/damping)
+        dt: mechanical timestep
         """
 
         displacement = (self.force / gamma) * dt
 
         self.pos += displacement
         self.force = np.zeros(2) # reset for next time step
+                                 # forces in the model are "instantaneous"
 
         # # Geometry: Set by flow field
         # self.outward_normal = np.zeros(2)

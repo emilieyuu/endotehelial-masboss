@@ -11,16 +11,14 @@ class RhoLookupTable:
 
 
     def _build_indexed_table(self, dir):
+        # Configure path and read csv in to dataframe 
         path = dir / self.cfg["files"]["recruitment_csv"]
-        var_map = self.cfg["recruitment_var_maps"]
-
         df_raw = pd.read_csv(path)
-        
         print(f">>> DEBUG: Successfully loaded recruitment parameter sweep data.")
 
-        # Map MaBoSS variable names to respective probability names. 
-        df_filtered = df_raw.dropna(axis=1).round(3)
-        df_filtered["p1_name"] = df_filtered["p1_name"].map(var_map)
+        # Extract protein name from paramater name.  
+        df_filtered = df_raw.dropna(axis=1).round(3).copy()
+        df_filtered["p1_name"] = df_filtered["p1_name"].str.extract(r'\$([A-Za-z0-9]+)_')
 
         # Create df indexed by protein activation probability. 
         df_index = df_filtered.set_index(["p1_name", "p1_value"])[["RhoA", "RhoC"]].reset_index()
@@ -28,23 +26,38 @@ class RhoLookupTable:
         return df_index
     
     def _build_interpolators(self, df):
-        interpolators = {}
+        # Initiate dict to hold interpolators
+        interpolators = {rho: {} for rho in ["RhoA", "RhoC"]}
 
-        for p in df['p1_name'].unique():
-            subset = df[df['p1_name'] == p].sort_values('p1_value')
-            interpolators[p] = {"RhoA": interp1d(subset['p1_value'], subset['RhoA'], bounds_error=False, fill_value='extrapolate'),
-                                "RhoC": interp1d(subset['p1_value'], subset['RhoC'], bounds_error=False, fill_value='extrapolate')}
-            
+        # Build interpolator for RhoA and RhoC for each protein. 
+        for p, subset in df.groupby('p1_name'):
+            subset = subset.sort_values('p1_value')
+
+            for rho in ["RhoA", "RhoC"]:
+                interpolators[rho][p] = interp1d(
+                    subset['p1_value'],
+                    subset[rho],
+                    bounds_error=False,
+                    fill_value='extrapolate'
+                )
+
         return interpolators
 
     def query(self, p_dsp, p_tjp1, p_jcad):
-        vals = {
-            "p_dsp": (self.interpolators["p_dsp"]["RhoA"](p_dsp), self.interpolators["p_dsp"]["RhoC"](p_dsp)), 
-            "p_tjp1": (self.interpolators["p_tjp1"]["RhoA"](p_tjp1), self.interpolators["p_tjp1"]["RhoC"](p_tjp1)), 
-            "p_jcad": (self.interpolators["p_jcad"]["RhoA"](p_jcad), self.interpolators["p_jcad"]["RhoC"](p_jcad))
-        }
+        """
+        Allows objects to query the Lookup Table.
 
-        p_rhoA = np.mean([v[0] for v in vals.values()])
-        p_rhoC = np.mean([v[1] for v in vals.values()])
+        Query using junction protein activation probabilities.
+        Returns activation/concentration of RhoA and RhoC. 
+        """
+        probs = {"DSP": p_dsp, "TJP1": p_tjp1, "JCAD": p_jcad}
+
+        vals = [
+            (self.interpolators['RhoA'][k](v), self.interpolators['RhoC'][k](v))
+            for k, v in probs.items()
+        ]
+
+        p_rhoA = np.mean([v[0] for v in vals])
+        p_rhoC = np.mean([v[1] for v in vals])
 
         return p_rhoA, p_rhoC
