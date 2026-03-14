@@ -9,7 +9,7 @@
 # 2. Alignment to flow: alignment
 # 3. Junction proteins: DSP, TJP1, JCAD
 # 4. RhoA/RhoC
-# 5. Differentiation between cortical/sf: k_cortical, L_cortical, L_sf
+# 5. Differentiation between cortical/sf: k_active, L_rest_active, L_sf
 
 import numpy as np
 from abm.abm_helpers import hill, get_recruitment, calculate_bilinear_tension
@@ -35,15 +35,15 @@ class Spring:
         self.node_2 = node_2
 
         # Spring Initial Mechanical (rest)
-        self.L_rest = rest_length # spring rest length
+        self.L_init = rest_length # spring rest length
         self.k_base = k_base # stiffness of actin filaments
 
         # Cortical Spring Mechanics (current)
-        self.L_cortical = rest_length
-        self.k_cortical = k_base # active stiffness at any moment (changes with RhoA)
+        self.L_rest_active = rest_length # active rest length
+        self.k_active = k_base # active stiffness at any moment (changes with RhoA)
 
         # Spring Geometry – Recomputed at each step
-        self.length = rest_length
+        self.L_current = rest_length
         self.tension = 0.0 # follows bilinear law
         self.unit_vec = np.zeros(2) # unit vector, represent spring orientation (node_1 + node_2)
         self.alignment = 0.0 # alignment of junction to flow (1 = parallel, 0 = perpendicular)
@@ -69,8 +69,8 @@ class Spring:
             return
 
         # Update length
-        self.length = length
-        self.unit_vec = diff / self.length # calclate unit vector representation of junction
+        self.L_current = length
+        self.unit_vec = diff / self.L_current # calclate unit vector representation of junction
         self.alignment = abs(np.dot(self.unit_vec, flow_direction))
         print(f""">>> DEBUG: Calcualted Geometry for Spring {self.id}
               diff: {diff.round(2)} | length: {length.round(2)} | unit vect: {self.unit_vec.round(2)} | alignment: {self.alignment:.2f}""")
@@ -78,8 +78,8 @@ class Spring:
         # Update spring tension 
         kc_ratio = self.cfg['mechanics']['kc_ratio']
         self.tension = calculate_bilinear_tension(
-            self.length, self.L_cortical, 
-            self.k_cortical, kc_ratio)
+            self.L_current, self.L_rest_active, 
+            self.k_active, kc_ratio)
 
     
     def update_signalling(self, perturbation='WT'):
@@ -140,18 +140,18 @@ class Spring:
 
         # Relax toward targets (First-order lag)
         alpha = dt / tau
-        self.k_cortical += alpha * (k_target - self.k_cortical)
-        self.L_cortical += alpha * (L_target - self.L_cortical)
-        print(f"k_cortical: {self.k_cortical}, L_cortical: {self.L_cortical}")
+        self.k_active += alpha * (k_target - self.k_active)
+        self.L_rest_active += alpha * (L_target - self.L_rest_active)
+        print(f"k_active: {self.k_active}, L_rest_active: {self.L_rest_active}")
 
     def calculate_forces(self):
         """
         Calculates the force vector and applies it to the two connected nodes.
         """
-        if self.length < 1e-10:
+        if self.L_current < 1e-10:
             return
         
-        f = calculate_bilinear_tension(self.length, self.L_cortical, self.k_cortical,
+        f = calculate_bilinear_tension(self.L_current, self.L_rest_active, self.k_active,
                                     self.cfg['mechanics']['kc_ratio'])
         
         # The scalar tension (magnitude) was calculated in update_geometry
@@ -165,7 +165,7 @@ class Spring:
 
     def __repr__(self):
         return (f"Spring({self.node_1.id}→{self.node_2.id} | "
-                f"L={self.length:.3f} L0={self.L_rest:.3f} | "
+                f"L={self.L_current:.3f} L0={self.L_rest:.3f} | "
                 f"T={self.tension:.3f} align={self.alignment:.3f} | "
                 f"DSP={self.DSP} TJP1={self.TJP1} JCAD={self.JCAD} | "
                 f"RhoA={self.P_RhoA:.3f} RhoC={self.P_RhoC:.3f})")
