@@ -1,174 +1,264 @@
 # abm/spring.py
 #
-# Represents a spring between two membrane nodes: the Junction. 
-# Each junction acts as a self-contained mechanosensing unit.
-# Mechanical input of junction proteins is spring tension. 
+# A Spring represents a junction between 2 adjacent membrane nodes. 
 #
-# Has: 
-# 1. Spring Properties: rest_length, k_base, length, tension
-# 2. Alignment to flow: alignment
-# 3. Junction proteins: DSP, TJP1, JCAD
-# 4. RhoA/RhoC
-# 5. Differentiation between cortical/sf: k_active, L_rest_active, L_sf
+# Cortical Spring: Passive elastic resistance of actin cortex,
+#                  actively stiffened by DSP -> RhoA
+# Stress Fibre: Active contractile element driven by TJP1 -> RhoC, 
+#               only develops along the flow axis
 
 import numpy as np
-from abm.abm_helpers import hill, get_recruitment, calculate_bilinear_tension
+from abm.abm_helpers import *
 
 
-###
-# Spring Class
-### 
 class Spring: 
     """
-    Represents junction between two adjacent membrane nodes.
-    Tracks Length, Stiffness, Proteins and Rho. 
+    Mechnical junction between 2 adjacent membrane nodes. 
+
+    GEOMETRY (updated every step from node position): 
+    - L_current: physical distance between node_1 and node_2
+    - unit_vect: unit vector pointing from node_1 to node_2
+    - alignment: angle between spring an flow
+
+    CORTICAL (RhoA pathway): 
+    - L_cortex: rest length of cortical spring, fixed
+    - k_cortex: baseline cortical stiffness, fixed
+    - k_active: current cortical stiffness, remodelled by RhoA
+
+    STRESS FIBRE: 
+    - L_sf: current rest length of stress fibre, shortened by RhoC 
+            on lateral junctions
+    - k_sf: stress fibre stiffness, fixed fraction of k_cortex
+            (stiffer per unit length than cortex)
+
+    TENSION (computer each step, sum of both subsystems)
+    - tension_cortex = cortical component, k_active * (L_current - L_cortex)
+    - tension_sf = sf component, k_sf * (L_current - L_sf) * alignment
+    - tension_total = cortex + sf, scalar used to compute fprce vectprs
     """
-    def __init__(self, spring_id: int, node_1, node_2, 
-                 rest_length: float, lut, cfg, k_base=1.0):
+
+    def __init__(self, spring_id, node_1, node_2, 
+                 rest_length, k_cortex, lut, cfg):
         
-        self.lut = lut # rho lookup table
+        self.lut = lut
         self.cfg = cfg
-        
-        # Spring General Properties
         self.id = spring_id
+
         self.node_1 = node_1
         self.node_2 = node_2
 
-        # REFERNCE: Length and stiffness upon initialisation
-        self.L_init = rest_length 
-        self.k_base = k_base 
+        # Cortical Subsystem
+        self.L_cortex = rest_length # fixed geometric reference
+        self.k_cortex = k_cortex # fixed passive stiffness reference
+        self.k_active = k_cortex # dynamic, remodelled towards target by RhoA
 
-        # DYNAMIC: Remodeled length and stiffness
-        self.L_rest_active = rest_length 
-        self.k_active = k_base 
+        # Stress Fibre Subsystem
+        sf_fraction = cfg['mechanics'].get('k_sf_fraction', 0.4)
+        self.k_sf = k_cortex * sf_fraction # fixed stiffness
+        self.L_sf = rest_length # dynamic rest length, shortened by RhoA
 
-        # INSTANT GEOMETRY: Physical state this frame
+        # Instantaneous Geomtry –Uupdated at Each Step 
         self.L_current = rest_length
-        self.tension = 0.0 # follows bilinear law
-        self.unit_vec = np.zeros(2) # unit vector, represent spring orientation (node_1 + node_2)
-        self.alignment = 0.0 # alignment of junction to flow (1 = parallel, 0 = perpendicular)
+        self.unit_vec = np.zeros(2)
+        self.alignment = 0.0
 
-        # Junction Protein and Rho States 
+        # Tension Components
+        self.tension_cortex, self.tension_sf, self.tension_total = 0.0, 0.0, 0.0
+
+        # Signalling State
         self.DSP, self.TJP1, self.JCAD = 0.0, 0.0, 0.0
         self.P_RhoA, self.P_RhoC = 0.0, 0.0
 
-    
+    # ------------------------------------------------------------------
+    # 1: Update Geometry and Tension
+    # ------------------------------------------------------------------
     def update_geometry(self, flow_direction):
-        """
-        Recompute length, unit vector, flow alignment and tension. 
+        """ 
+        Recompute all geometry from current node positions, then 
+        compute tension for both subsystems (from previous step). 
 
-        unit_vec points from node 1 to node 2
+        Called first in every timestep.
+        Tension values computed here are what update_signalling reads.
         """
-        # Compute length of junction
-        diff = self.node_2.pos - self.node_1.pos # unit vector point from node 1 to 2
-        length = np.linalg.norm(diff)
+
+        # Compute and update length (norm) of spring
+        diff = self.node_2.pos - self.node_1.pos 
+        length = np.linalg.norm(diff) # Euclidian norm of vector
 
         if length < 1e-10:
+            return # If length has collapsed, skip division
+        
+        self.L_current = length
+
+        # Compute Spring alignment to flow
+        self.unit_vec = diff / length # unit vector pointing from node1 to node2 (spring orientation)
+        self.alignment = abs(np.dot(self.unit_vec, flow_direction)) # |cos(a)| between spring and flow axis
+
+        # Compute cortical tension
+        # Rest length is L_cortex (fixed geometry), stiffness is k_active (RhoA-remodelled)
+        self.tension_cortex = bilinear_tension(
+            l_current=self.L_current, 
+            l_rest=self.L_cortex, 
+            k_tensile=self.k_active, 
+            kc_ratio = self.cfg['mechanics']['kc_ratio']
+        )
+
+        # Stress Fibre Tension 
+        # Rest length is L_sf (RhoC-remodelled), stiffness is k_sf (fixed)
+        sf_extension = self.L_current - self.L_sf
+        self.tension_sf = max(
+            self.k_sf * sf_extension * self.alignment, # weighted by alignment (lateral highest)
+            0.0 # fibres do not generate compressive force (only pull, no pushh)
+        )
+
+        self.tension_total = self.tension_cortex + self.tension_sf
+
+    # ------------------------------------------------------------------
+    # 2: Apply Spring Forces
+    # ------------------------------------------------------------------
+    def apply_forces(self):
+        """
+        Push the net spring tension onto both connected nodes as equal
+        and opposite force vectors.
+
+        When tension > 0 (spring stretched):
+            node_1 gets +force_vec  (pulled toward node_2) 
+            node_2 gets -force_vec  (pulled toward node_1)
+
+        When tension < 0 (spring compressed):
+            node_1 gets +force_vec  (pushed away from node_2) 
+            node_2 gets -force_vec  (pushed away from node_1) 
+        """
+        if self.L_current < 1e-10:
             return
 
-        # Update length
-        self.L_current = length
-        self.unit_vec = diff / self.L_current # calclate unit vector representation of junction
-        self.alignment = abs(np.dot(self.unit_vec, flow_direction))
+        force_vec = self.tension_total * self.unit_vec
+        self.node_1.apply_force(force_vec)
+        self.node_2.apply_force(-force_vec)
 
-        # Update spring tension 
-        kc_ratio = self.cfg['mechanics']['kc_ratio']
-        self.tension = calculate_bilinear_tension(
-            self.L_current, self.L_rest_active, 
-            self.k_active, kc_ratio)
-
-    
-    def update_signalling(self, perturbation='WT'):
+    # ------------------------------------------------------------------
+    # 3: Update Signalling (Junction proteins + Rho)
+    # ------------------------------------------------------------------
+    def update_signalling(self):
         """
-        Convert mechanical state to Rho activity via Junction Proteins
-        """
-        tensile = max(self.tension, 0) 
-
-        # CHANGE: DSP/JCAD response field
-        tau_dsp = tensile # responds to raw junction load
-        tau_tjp1 = abs(tensile) #tensile * (1 - self.alignment) # senses compression at upstream face
-        tau_jcad = tensile * self.alignment # shear-flow amplifier, most active at lateral junctions
-
-        # Calculate Hill-based probabilities for protein recruitment 
-        self.DSP = get_recruitment(self.cfg, tau_dsp, 'DSP')
-        self.TJP1 = get_recruitment(self.cfg, tau_tjp1, 'TJP1')
-        self.JCAD = get_recruitment(self.cfg, tau_jcad, 'JCAD')
-
-        # Get RhoA / RhoC probabilities from Lookup table
-        self.P_RhoA, self.P_RhoC = self.lut.query(self.DSP, self.TJP1, self.JCAD)
-
-
-    def update_stiffness(self, dt=0.1):
-        """
-        Translate Rho activity to mechanical spring parameters
-
-        RhoA → contractility → cortical spring stiffer + shorter rest length
-        RhoC → stress fibre prestretch → L_sf < rest_length
-        """
-        spring_cfg = self.cfg['mechanics']
-        tau = spring_cfg['tau_remodel'] # constant time for remodelling
-
-        # Relative Rho Activation above baseline
-        delta_rhoA = max(self.P_RhoA - self.lut.rhoA_rest, 0.0)
-        delta_rhoC = max(self.P_RhoC - self.lut.rhoC_rest, 0.0)
-
-        # Calculate target stiffness (where spring wants to be)
-        k_target = self.k_base * (1.0 + spring_cfg['rhoa_k_gain'] * delta_rhoA)
-
-        # Calculate target length relative to initial length
-        l_shrink_rhoa = spring_cfg['rhoa_l_shrink'] * delta_rhoA
-        # RhoC shortening is alignment-weighted AND capped to prevent runaway
-        l_shrink_rhoc = spring_cfg['rhoc_l_shrink'] * delta_rhoC * (1.0 - self.alignment)        
+        Converts mechanical state -> junction protein recruitment -> Rho activity.
         
-        L_target = self.L_init * (1.0 - l_shrink_rhoa - l_shrink_rhoc)
-        L_target = max(L_target, self.L_init * 0.4) # Physical limit
+        tau: mechanical stimulus for each protein.
+        tau_dsp: raw tension, no weighting.
+        tau_tjp1: most strongly loaded a junctions perpendicular to flow.
+        tau_jcad: loaded at lateral junction feeling flow.
+        """
 
-        # Relax toward targets (First-order lag)
-        alpha = dt / tau
+        # Compute Mechanical Input
+        tensile = max(self.tension_total, 0.0) # no recruitment in compressed junctions
+        tau_dsp  = tensile
+        tau_tjp1 = tensile * (1.0 - self.alignment)
+        tau_jcad = tensile * self.alignment
+
+        # Get Junction Protein Recruitment
+        self.DSP  = get_protein_recruitment(self.cfg, tau_dsp,  'DSP')
+        self.TJP1 = get_protein_recruitment(self.cfg, tau_tjp1, 'TJP1')
+        self.JCAD = get_protein_recruitment(self.cfg, tau_jcad, 'JCAD')
+
+        # Get RhoA/RhoC activation
+        self.P_RhoA, self.P_RhoC = self.lut.query(
+            self.DSP, self.TJP1, self.JCAD
+        )
+
+
+    # ------------------------------------------------------------------
+    # 4: Remodel Mechanical Parameters
+    # ------------------------------------------------------------------
+    def _remodel_cortex(self, dt):
+        """
+        RhoA pathway: raises cortical stiffness. 
+        Only activity above baseline ($RhoA_basal) drives remodelling.
+
+        param dt: Timestep
+        """
+        mech = self.cfg['mechanics']
+
+        # Compute RhoA Activity Above Baseline
+        delta_rhoa = max(self.P_RhoA - self.lut.rhoa_rest, 0.0) 
+
+        # Compute Target Stiffness
+        k_target = self.k_cortex * (1.0 + mech['rhoa_k_gain'] * delta_rhoa)
+
+        # First Order Lag Remodelling
+        alpha = dt / mech['tau_remodel'] # how much 
         self.k_active += alpha * (k_target - self.k_active)
-        self.L_rest_active += alpha * (L_target - self.L_rest_active)
 
-    def calculate_forces(self):
+    def _remodel_sf(self, dt):
         """
-        Calculates the force vector and applies it to the two connected nodes.
-        """
-        if self.L_current < 1e-10:return
-        force_vec = self.tension * self.unit_vec
-        
-        # Apply equal and opposite forces
-        # CHANGE: tension should pull nodes together not tear them part
-        self.node_1.apply_force(force_vec) # Negative
-        self.node_2.apply_force(-force_vec) # Positive
+        RhoC pathway: shortens stress fibre rest length on flow-aligned junctions
 
-    def get_spring_summary(self):
+        param dt: Timestep
         """
-        Returns a structured dictionary of the spring's current state.
-        Use this for logging, CSV export, or detailed debugging.
+        mech = self.cfg['mechanics']
+
+        # Compute RhoC Activity Above Baseline
+        delta_rhoc = max(self.P_RhoC - self.lut.rhoc_rest, 0.0) 
+
+        # Only shorten L_sf is spring is currently under tension. 
+        if self.L_current > self.L_cortex:
+            # Stress fibres assemble at stretched junctions 
+            # Compute How Much Fibre Should Shrink By
+            shrink = mech['rhoc_l_shrink'] * delta_rhoc * self.alignment
+            shrink = min(shrink, mech.get('rhoc_max_shrink', 0.25))
+
+            # Compute Target Shrinkage (Capped at 40% of inital length)
+            L_sf_target = self.L_cortex * (1.0 - shrink)
+            L_sf_target = max(L_sf_target, self.L_cortex * 0.4)
+        else: 
+            # Spring is slack or compressed — fibres relax back toward cortex length
+            # This also handles the case where flow is removed: fibres dissolve
+            L_sf_target = self.L_cortex
+
+        # First Order Lag Remodelling
+        alpha = dt / mech['tau_remodel']
+        self.L_sf += alpha * (L_sf_target - self.L_sf)
+
+    def update_remodelling(self, dt):
+        """
+        Public Remodelling Method: Remodel cortex followed by stress fibres
+        Uses tension from this step, updating parameters for the next one. 
+        Sees mechanical state after nodes move.
+        """
+        self._remodel_cortex(dt)
+        self._remodel_sf(dt)
+
+    # ------------------------------------------------------------------
+    # Diagnostics & Debugging
+    # ------------------------------------------------------------------
+    def get_state(self):
+        """
+        Full state snapshot for logging and debugging.
+        Returns every meaningful variable in one flat dict.
         """
         return {
-            "id": self.id,
-            "geometry": {
-                "L_curr": round(self.L_current, 3),
-                "L_active": round(self.L_rest_active, 3),
-                "tension": round(self.tension, 4),
-                "align": round(self.alignment, 3)
-            },
-            "proteins": {
-                "DSP": round(self.DSP, 3),
-                "TJP1": round(self.TJP1, 3),
-                "JCAD": round(self.JCAD, 3)
-            },
-            "signaling": {
-                "RhoA": round(self.P_RhoA, 3),
-                "RhoC": round(self.P_RhoC, 3)
-            },
-            "mechanics": {
-                "k_active": round(self.k_active, 3)
-            }
+            'id':             self.id,
+            'L_current':      round(self.L_current, 4),
+            'L_cortex':       round(self.L_cortex, 4),
+            'L_sf':           round(self.L_sf, 4),
+            'k_active':       round(self.k_active, 4),
+            'alignment':      round(self.alignment, 3),
+            'tension':        round(self.tension, 4),
+            'tension_cortex': round(self.tension_cortex, 4),
+            'tension_sf':     round(self.tension_sf, 4),
+            'DSP':            round(self.DSP, 3),
+            'TJP1':           round(self.TJP1, 3),
+            'JCAD':           round(self.JCAD, 3),
+            'P_RhoA':         round(self.P_RhoA, 3),
+            'P_RhoC':         round(self.P_RhoC, 3),
         }
-
+    
     def __repr__(self):
-        s = self.get_spring_summary()
-        return (f"Spring {self.id} | L={s['geometry']['L_curr']} | "
-                f"T={s['geometry']['tension']} | RhoA/C={s['signaling']['RhoA']}/{s['signaling']['RhoC']}")
-
+        return (
+            f"Spring(id={self.id} | "
+            f"L_current={self.L_current:.3f} L_cortex={self.L_cortex:.3f} L_sf={self.L_sf:.3f}\n "
+            f"k_active={self.k_active:.3f} | "
+            f"align={self.alignment:.2f} | "
+            f"T={self.tension_total:.4f} [cortex={self.tension_cortex:.4f} sf={self.tension_sf:.4f}] | \n "
+            f"DSP={self.DSP:.3f} TJP1={self.TJP1:.3f}) JCAD={self.JCAD:.3f} | "
+            f"RhoA={self.P_RhoA:.3f} RhoC={self.P_RhoC:.3f})"
+        )

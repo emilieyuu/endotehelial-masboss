@@ -6,28 +6,28 @@ files:
 
 sim: 
   dt: 0.1
-  gamma: 5.0 # viscuous drag on each mode (higher ≈ slower movement)
-  # At gamma = 1.0, k_cortex = 1.0, a force of 1.0 moves a node by 0.1 units per step.
+  gamma: 1.0 # viscuous drag on each mode (higher ≈ slower movement)
+    # At gamma = 1.0, k_cortex = 1.0, a force of 1.0 moves a node by 0.1 units per step.
 
 
 # Protein-Specifc Hill Parameters
 hill_params: # Maps to protein recruitment
-  DSP: {K: 0.2, n: 3, p_max: 0.67, knocked_out: False}
-  TJP1: {K: 0.15, n: 2, p_max: 0.67, knocked_out: False}
-  JCAD: {K: 0.2, n: 4, p_max: 0.67, knocked_out: False}
+  DSP: {K: 0.25, n: 3, p_max: 0.67, knocked_out: False}
+  TJP1: {K: 0.15, n: 3, p_max: 0.67, knocked_out: False}
+  JCAD: {K: 0.25, n: 4, p_max: 0.67, knocked_out: False}
 
 # Parameter for tension calculation
 mechanics:
   # --- Cortical spring ---
   k_cortex: 1.0 # Reference stiffness
   kc_ratio: 0.1 # Compressive stiffness = 0.1 of tensile
-  rhoa_k_gain: 2.5 #RhoA above baseline can raise k_active to (1 + 2.5 * delta_rhoA) * k_cortex.
-    # At full activation (delta_rhoA = 1): k_active = 3.5 * k_cortex.
+  rhoa_k_gain: 8.0 #RhoA above baseline can raise k_active to (1 + 8.0 * delta_rhoA) * k_cortex.
+    # At full activation (delta_rhoA = 0.207): k_active = 2.5 * k_cortex.
 
   # --- Stress fibre ---
   k_sf_fraction: 0.4 # Stress fibre stiffness = 40% of k_cortex.
-  rhoc_l_shrink: 0.25 # Maximum fractional shortening of L_sf under full RhoC activation
-  rhoc_max_shrink: 0.25 # Absolute cap on L_sf reduction.
+  rhoc_l_shrink: 1.0 # Maximum fractional shortening of L_sf under full RhoC activation
+  rhoc_max_shrink: 0.20 # Absolute cap on L_sf reduction.
 
   # --- Shared remodelling ---
   tau_remodel: 100.0 # Time constant for both cortex and fibre remodelling.
