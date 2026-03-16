@@ -21,8 +21,8 @@ from abm.abm_helpers import hill, get_recruitment, calculate_bilinear_tension
 class Spring: 
     """
     Represents junction between two adjacent membrane nodes.
+    Tracks Length, Stiffness, Proteins and Rho. 
     """
-
     def __init__(self, spring_id: int, node_1, node_2, 
                  rest_length: float, lut, cfg, k_base=1.0):
         
@@ -34,24 +34,22 @@ class Spring:
         self.node_1 = node_1
         self.node_2 = node_2
 
-        # Spring Initial Mechanical (rest)
-        self.L_init = rest_length # spring rest length
-        self.k_base = k_base # stiffness of actin filaments
+        # REFERNCE: Length and stiffness upon initialisation
+        self.L_init = rest_length 
+        self.k_base = k_base 
 
-        # Cortical Spring Mechanics (current)
-        self.L_rest_active = rest_length # active rest length
-        self.k_active = k_base # active stiffness at any moment (changes with RhoA)
+        # DYNAMIC: Remodeled length and stiffness
+        self.L_rest_active = rest_length 
+        self.k_active = k_base 
 
-        # Spring Geometry – Recomputed at each step
+        # INSTANT GEOMETRY: Physical state this frame
         self.L_current = rest_length
         self.tension = 0.0 # follows bilinear law
         self.unit_vec = np.zeros(2) # unit vector, represent spring orientation (node_1 + node_2)
         self.alignment = 0.0 # alignment of junction to flow (1 = parallel, 0 = perpendicular)
 
-        # Junction Protein States
+        # Junction Protein and Rho States 
         self.DSP, self.TJP1, self.JCAD = 0.0, 0.0, 0.0
- 
-        # Rho Activation Proability
         self.P_RhoA, self.P_RhoC = 0.0, 0.0
 
     
@@ -72,8 +70,6 @@ class Spring:
         self.L_current = length
         self.unit_vec = diff / self.L_current # calclate unit vector representation of junction
         self.alignment = abs(np.dot(self.unit_vec, flow_direction))
-        print(f""">>> DEBUG: Calcualted Geometry for Spring {self.id}
-              diff: {diff.round(2)} | length: {length.round(2)} | unit vect: {self.unit_vec.round(2)} | alignment: {self.alignment:.2f}""")
 
         # Update spring tension 
         kc_ratio = self.cfg['mechanics']['kc_ratio']
@@ -88,23 +84,18 @@ class Spring:
         """
         tensile = max(self.tension, 0) 
 
-        tau_dsp = tensile * self.alignment # senses shear drag on lateral junctions
-        tau_tjp1 = tensile * (1 - self.alignment) # senses compression at upstream face
-        tau_jcad = tensile # senses crowding at upstream face
-
-        print(f">>> DEBUG: Computed mechnical input tau_dsp: {tau_dsp:.2f}, tau_tjp1: {tau_tjp1:.2f}, tau_jcad: {tau_jcad:.2f}")
+        # CHANGE: DSP/JCAD response field
+        tau_dsp = tensile # responds to raw junction load
+        tau_tjp1 = abs(tensile) #tensile * (1 - self.alignment) # senses compression at upstream face
+        tau_jcad = tensile * self.alignment # shear-flow amplifier, most active at lateral junctions
 
         # Calculate Hill-based probabilities for protein recruitment 
         self.DSP = get_recruitment(self.cfg, tau_dsp, 'DSP')
         self.TJP1 = get_recruitment(self.cfg, tau_tjp1, 'TJP1')
         self.JCAD = get_recruitment(self.cfg, tau_jcad, 'JCAD')
-        print(f""">>>INFO: Protein Recruitment for spring {self.id} is
-               DSP: {self.DSP}, TJP1: {self.TJP1}, JCAD: {self.JCAD}""")
 
         # Get RhoA / RhoC probabilities from Lookup table
         self.P_RhoA, self.P_RhoC = self.lut.query(self.DSP, self.TJP1, self.JCAD)
-        print(f""">>>INFO: Rho Activation for sprinG {self.id} is 
-              RhoA: {self.P_RhoA:.2f}, RhoC: {self.P_RhoC:.2f}""")
 
 
     def update_stiffness(self, dt=0.1):
@@ -117,56 +108,67 @@ class Spring:
         spring_cfg = self.cfg['mechanics']
         tau = spring_cfg['tau_remodel'] # constant time for remodelling
 
-        # How much Rho is active ABOVE the resting competition baseline
-        # Contract if Rho is above resting level
-        rhoA_rest = self.lut.rhoA_rest
-        rhoC_rest = self.lut.rhoC_rest
-        delta_rhoA = max(self.P_RhoA - rhoA_rest, 0.0)
-        delta_rhoC = max(self.P_RhoC - rhoC_rest, 0.0)
+        # Relative Rho Activation above baseline
+        delta_rhoA = max(self.P_RhoA - self.lut.rhoA_rest, 0.0)
+        delta_rhoC = max(self.P_RhoC - self.lut.rhoC_rest, 0.0)
 
-        # Calculate target (Where spring wants to be)
-        # RhoA stiffens, RhoC + alignment thins the cell
+        # Calculate target stiffness (where spring wants to be)
         k_target = self.k_base * (1.0 + spring_cfg['rhoa_k_gain'] * delta_rhoA)
-        print(f"k_target: {k_target}")
 
-        # L_target shrings with RhoA and RhoC * alignment (lateral thinning)
+        # Calculate target length relative to initial length
         l_shrink_rhoa = spring_cfg['rhoa_l_shrink'] * delta_rhoA
-        l_shrink_rhoc = spring_cfg['rhoc_l_shrink'] * delta_rhoC * self.alignment
-        print(f"l_shrink_rhoa: {l_shrink_rhoa}, l_shrink_rhoc: {l_shrink_rhoc}")
-
-        L_target = self.L_rest * (1.0 - l_shrink_rhoa - l_shrink_rhoc)
-        L_target = max(L_target, self.L_rest * 0.4) # Physical limit
-        print(f"L_target: {L_target}")
+        # RhoC shortening is alignment-weighted AND capped to prevent runaway
+        l_shrink_rhoc = spring_cfg['rhoc_l_shrink'] * delta_rhoC * (1.0 - self.alignment)        
+        
+        L_target = self.L_init * (1.0 - l_shrink_rhoa - l_shrink_rhoc)
+        L_target = max(L_target, self.L_init * 0.4) # Physical limit
 
         # Relax toward targets (First-order lag)
         alpha = dt / tau
         self.k_active += alpha * (k_target - self.k_active)
         self.L_rest_active += alpha * (L_target - self.L_rest_active)
-        print(f"k_active: {self.k_active}, L_rest_active: {self.L_rest_active}")
 
     def calculate_forces(self):
         """
         Calculates the force vector and applies it to the two connected nodes.
         """
-        if self.L_current < 1e-10:
-            return
-        
-        f = calculate_bilinear_tension(self.L_current, self.L_rest_active, self.k_active,
-                                    self.cfg['mechanics']['kc_ratio'])
-        
-        # The scalar tension (magnitude) was calculated in update_geometry
-        # We turn it into a vector. Tension > 0 pulls nodes together.
-        force_vec = f * self.unit_vec
+        if self.L_current < 1e-10:return
+        force_vec = self.tension * self.unit_vec
         
         # Apply equal and opposite forces
-        self.node_1.apply_force(force_vec) # Pushes node 1 away from node 2
-        self.node_2.apply_force(-force_vec)
+        # CHANGE: tension should pull nodes together not tear them part
+        self.node_1.apply_force(force_vec) # Negative
+        self.node_2.apply_force(-force_vec) # Positive
 
+    def get_spring_summary(self):
+        """
+        Returns a structured dictionary of the spring's current state.
+        Use this for logging, CSV export, or detailed debugging.
+        """
+        return {
+            "id": self.id,
+            "geometry": {
+                "L_curr": round(self.L_current, 3),
+                "L_active": round(self.L_rest_active, 3),
+                "tension": round(self.tension, 4),
+                "align": round(self.alignment, 3)
+            },
+            "proteins": {
+                "DSP": round(self.DSP, 3),
+                "TJP1": round(self.TJP1, 3),
+                "JCAD": round(self.JCAD, 3)
+            },
+            "signaling": {
+                "RhoA": round(self.P_RhoA, 3),
+                "RhoC": round(self.P_RhoC, 3)
+            },
+            "mechanics": {
+                "k_active": round(self.k_active, 3)
+            }
+        }
 
     def __repr__(self):
-        return (f"Spring({self.node_1.id}→{self.node_2.id} | "
-                f"L={self.L_current:.3f} L0={self.L_rest:.3f} | "
-                f"T={self.tension:.3f} align={self.alignment:.3f} | "
-                f"DSP={self.DSP} TJP1={self.TJP1} JCAD={self.JCAD} | "
-                f"RhoA={self.P_RhoA:.3f} RhoC={self.P_RhoC:.3f})")
+        s = self.get_spring_summary()
+        return (f"Spring {self.id} | L={s['geometry']['L_curr']} | "
+                f"T={s['geometry']['tension']} | RhoA/C={s['signaling']['RhoA']}/{s['signaling']['RhoC']}")
 

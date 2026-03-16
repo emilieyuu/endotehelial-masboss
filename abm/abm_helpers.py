@@ -2,39 +2,50 @@ import numpy as np
 
 def hill(tau, K, n):
     """
-    S: Sensitivity input (sheae nmagnitude / force)
-    K: Half activation thershold
-    n: Hill coefficiet
+    Hill activation function. Maps mechanical stimulus (tau) to 
+    protein recruitment probability. 
+
+    tau: Mechnical stimulus – a tension magnitude
+    K: Half Activation Threshold – the tau at which recruitment = 0.5.
+    n: Hill coefficient – controls spring sharpness.
     """
     if tau <= 0: 
-        return 0.0
+        return 0.0 # No recruitment under compression. 
     
     return tau**n / (K**n + tau**n)
 
-def get_recruitment(cfg, tau, protein):
+def get_recruitment(cfg, tau, protein, perturbation='WT'):
     """
-    Tension-Based Hill recruitment for protein. 
+    Look up Hill parameters for protein and return recruitment probability.
     """
-    hill_params = cfg['hill_params'][protein]
+    params = cfg['hill_params'][protein]
 
-    K = hill_params['K']
-    n = hill_params['n']
+    if params.get('knocked_out', False):
+        print(">>> DEBUG: {protein} is knocked out, recruitment is 0")
+        return 0.0 # No recruitment if protein is knocked out regardless of tau.
 
-    return hill(tau, K ,n)
+    p_raw = hill(tau, params['K'], params['n'])
+    # Scale to physiological range from MaBoSS
+    p_max = params.get('p_max', 1.0)   # set per-protein in config
+    return p_raw * p_max
 
-def calculate_bilinear_tension(l, l0, kt, kc_ratio=0.1):
+def calculate_bilinear_tension(l_current, l_rest, k_tensile, kc_ratio):
     """
-    l: current_length
-    l0: rest_length
-    kt: tensile stiffness (from RhoA/RhoC mapping)
-    kc_ratio: 0.1 (compressive stiffness is 10% of tensile)
+    Bilinear elastic law for single spring component.
+
+    l_current: Current physical length of the spring
+    l_rest: Rest length – length when spring is stress free
+    k_tensile: Stiffness in the stretched regime
+    kc_ratio: Compressive stiffness as a fraction of tensile stiffness. 
+              0.1 means 10x softer in compression
     """
 
-    extension = l - l0 # current_length - rest_length
+    extension = l_current - l_rest # current_length - rest_length
+
     if extension > 0:
-        # Tension regime (Stretching) - gives positice tension
-        return kt * extension 
+        # Stretching Regime: tension > 0, pulls nodes together
+        return k_tensile * extension 
     else:
-        # Compression regime (Squishing) - gives smaller restoring force (10% stiffness)
-        kc = kt * kc_ratio
-        return kc * extension # This will be a negative value (pushing force)
+        # Compression Regime: tension < 0, pushes nodes aåart 
+        k_comp = k_tensile * kc_ratio
+        return k_comp * extension 
