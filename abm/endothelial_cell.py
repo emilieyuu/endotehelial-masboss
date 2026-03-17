@@ -46,8 +46,8 @@ class EndothelialCell:
         self.target_area = self._compute_area() # fixed, acts as reference
         self.current_area = self.target_area # dynamic, remodelled to maintain "incompressible cytoplasm"
 
-        print(f"DEBUG: Initialised Cell {self.id}: ")
-        print(self.__repr__())
+        #print(f"DEBUG: Initialised Cell {self.id}: ")
+        #print(self.__repr__())
     
     # ------------------------------------------------------------------
     # Initialisation
@@ -67,6 +67,9 @@ class EndothelialCell:
                 centroid[1] + radius * np.sin(angle),
             ])
             nodes.append(MembraneNode(i, pos))
+
+        # Store for anchoring force — focal adhesion reference positions
+        self._init_positions = [n.pos.copy() for n in nodes]
 
         return nodes
     
@@ -144,6 +147,17 @@ class EndothelialCell:
             norm_unit = outward / norm
             node.apply_force(norm_unit * pressure)
 
+    def _apply_anchoring_force(self):
+        """
+        Weak restoring force towards each node's initial position. 
+
+        Models focal adhesion to the substrate. 
+        """
+        k_anchor = self.cfg['mechanics'].get('k_anchor', 0.05)
+        for node, init_pos in zip(self.nodes, self._init_positions):
+            displacement = node.pos - init_pos
+            node.apply_force(-k_anchor * displacement)
+
     # ------------------------------------------------------------------
     # Timestep
     # ------------------------------------------------------------------
@@ -156,6 +170,9 @@ class EndothelialCell:
         for node in self.nodes:
             shear_force = flow_field.get_force_on_node(node.pos, centroid)
             node.apply_force(shear_force)
+
+        # Anchoring — prevents bulk translation, forces deformation
+        self._apply_anchoring_force()
 
         # Step 2: Spring Geometry and Tension
         for spring in self.springs:

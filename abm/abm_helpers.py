@@ -24,7 +24,7 @@ def get_protein_recruitment(cfg, tau, protein, perturbation='WT'):
     params = cfg['hill_params'][protein]
 
     if params.get('knocked_out', False):
-        print(f">>> DEBUG: {protein} is knocked out, recruitment is 0")
+        #print(f">>> DEBUG: {protein} is knocked out, recruitment is 0")
         return 0.0 # No recruitment if protein is knocked out regardless of tau.
 
     p_raw = hill(tau, params['K'], params['n'])
@@ -112,18 +112,22 @@ def measure_shape(cell) -> dict:
 
 def classify_phenotype(summary: dict) -> str:
     """
-    Classify cell into one of three phenotypes from a get_cell_summary()
-    output. Thresholds are starting points — calibrate against your
-    MaBoSS knockout experiments.
-
-    Returns: 'failed' | 'normal' | 'hyper'
+    Classify using mechanism signature, not just AR.
+    AR alone is insufficient — all three conditions elongate.
+    The distinguishing features are the remodelling pathway used.
     """
-    ar = summary['metrics']['ar']
-    balance = summary['signalling']['rho_balance']
+    ar           = summary['metrics']['ar']
+    balance      = summary['signalling']['rho_balance']
+    lsf_ratio    = summary['remodelling']['mean_lsf_ratio']
+    k_active     = summary['remodelling']['mean_k_active']
 
-    if ar < 1.4 or balance < -0.1:
-        return 'failed'
-    elif ar > 3.5 or balance > 0.25:
+    # Hyper: RhoC dominant, fibres shortening, cortex not stiffening
+    if balance > 0.3 and lsf_ratio < 0.95 and k_active < 1.2:
         return 'hyper'
-    else:
-        return 'normal'
+
+    # Failed: RhoA dominant, no fibre shortening, cortex strongly stiffened
+    if balance < -0.3 and lsf_ratio > 0.99 and k_active > 1.5:
+        return 'failed'
+
+    # Normal: both pathways active, balanced Rho
+    return 'normal'

@@ -152,7 +152,7 @@ class Spring:
         # Compute Mechanical Input
         tensile = max(self.tension_total, 0.0) # no recruitment in compressed junctions
         tau_dsp  = tensile
-        tau_tjp1 = tensile * (1.0 - self.alignment)
+        tau_tjp1 = tensile #abs(self.tension_total) * (1.0 - self.alignment) 
         tau_jcad = tensile * self.alignment
 
         # Get Junction Protein Recruitment
@@ -242,7 +242,7 @@ class Spring:
             'L_sf':           round(self.L_sf, 4),
             'k_active':       round(self.k_active, 4),
             'alignment':      round(self.alignment, 3),
-            'tension':        round(self.tension, 4),
+            'tension_total':        round(self.tension_total, 4),
             'tension_cortex': round(self.tension_cortex, 4),
             'tension_sf':     round(self.tension_sf, 4),
             'DSP':            round(self.DSP, 3),
