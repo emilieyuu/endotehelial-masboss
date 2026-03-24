@@ -58,76 +58,64 @@ def bilinear_tension(l_current, l_rest, k_tensile, kc_ratio):
 # Cell Analysis
 # ------------------------------------------------------------------
 
-def measure_shape(cell) -> dict:
-    """
-    PCA-based shape descriptors matching ImageJ conventions.
+# def measure_shape(cell) -> dict:
+#     """
+#     PCA-based shape descriptors matching ImageJ conventions.
 
-    Aspect ratio = 2√λ_major / 2√λ_minor
-        λ from covariance matrix of node positions.
-        1.0 = circle, >1.0 = elongated.
+#     Aspect ratio = 2√λ_major / 2√λ_minor
+#         λ from covariance matrix of node positions.
+#         1.0 = circle, >1.0 = elongated.
 
-    Orientation = angle of major eigenvector to x-axis (flow direction).
-        0° = elongated along flow (correct response).
-        90° = elongated perpendicular (incorrect).
-        Note: PCA eigenvectors have no preferred sign — use
-        elongation_index for a consistent signed measure.
+#     Orientation = angle of major eigenvector to x-axis (flow direction).
+#         0° = elongated along flow (correct response).
+#         90° = elongated perpendicular (incorrect).
+#         Note: PCA eigenvectors have no preferred sign — use
+#         elongation_index for a consistent signed measure.
 
-    Circularity = 4π × area / perimeter²
-        1.0 = perfect circle, →0 = elongated/irregular.
-        Matches ImageJ circularity metric exactly — allows direct
-        comparison with experimental microscopy data.
+#     Circularity = 4π × area / perimeter²
+#         1.0 = perfect circle, →0 = elongated/irregular.
+#         Matches ImageJ circularity metric exactly — allows direct
+#         comparison with experimental microscopy data.
 
-    Elongation index = (AR - 1) × |cos(orientation)|
-        Combines AR and alignment into one number.
-        0 = circular or perpendicular, positive = elongated along flow.
-        Use this as your primary phenotype classifier in time series.
-    """
-    pos = cell.positions
-    centered = pos - pos.mean(axis=0)
+#     Elongation index = (AR - 1) × |cos(orientation)|
+#         Combines AR and alignment into one number.
+#         0 = circular or perpendicular, positive = elongated along flow.
+#         Use this as your primary phenotype classifier in time series.
+#     """
+#     pos = cell.positions
+#     centered = pos - pos.mean(axis=0)
 
-    eigvals, eigvecs = np.linalg.eigh(np.cov(centered.T))
-    eigvals = np.maximum(eigvals, 0.0)
+#     eigvals, eigvecs = np.linalg.eigh(np.cov(centered.T))
+#     eigvals = np.maximum(eigvals, 0.0)
 
-    major_vec = eigvecs[:, 1]
-    major = 2.0 * np.sqrt(eigvals[1])
-    minor = 2.0 * np.sqrt(eigvals[0])
+#     major_vec = eigvecs[:, 1]
+#     major = 2.0 * np.sqrt(eigvals[1])
+#     minor = 2.0 * np.sqrt(eigvals[0])
 
-    perim = np.sum(np.linalg.norm(
-        np.diff(np.vstack([pos, pos[0]]), axis=0), axis=1
-    ))
+#     perim = np.sum(np.linalg.norm(
+#         np.diff(np.vstack([pos, pos[0]]), axis=0), axis=1
+#     ))
 
-    ar = major / (minor + 1e-10)
-    orientation = np.degrees(np.arctan2(major_vec[1], major_vec[0]))
-    elong_idx   = (ar - 1.0) * abs(np.cos(np.radians(orientation)))
+#     ar = major / (minor + 1e-10)
+#     orientation = np.degrees(np.arctan2(major_vec[1], major_vec[0]))
+#     elong_idx   = (ar - 1.0) * abs(np.cos(np.radians(orientation)))
 
-    return {
-        'aspect_ratio':     round(ar, 3),
-        'orientation':      round(orientation, 2),
-        'circularity':      round(4.0 * np.pi * cell.current_area /
-                                  (perim ** 2 + 1e-10), 3),
-        'elongation_index': round(elong_idx, 4),
-        'perimeter':        round(perim, 4),
-    }
+#     return {
+#         'aspect_ratio':     round(ar, 3),
+#         'orientation':      round(orientation, 2),
+#         'circularity':      round(4.0 * np.pi * cell.current_area /
+#                                   (perim ** 2 + 1e-10), 3),
+#         'elongation_index': round(elong_idx, 4),
+#         'perimeter':        round(perim, 4),
+#     }
 
 
-def classify_phenotype(summary: dict) -> str:
-    """
-    Classify using mechanism signature, not just AR.
-    AR alone is insufficient — all three conditions elongate.
-    The distinguishing features are the remodelling pathway used.
-    """
-    ar           = summary['metrics']['ar']
-    balance      = summary['signalling']['rho_balance']
-    lsf_ratio    = summary['remodelling']['mean_lsf_ratio']
-    k_active     = summary['remodelling']['mean_k_active']
+def classify_phenotype(summary):
+    balance  = summary['signalling']['rho_balance']
+    k_active = summary['remodelling']['mean_k_active']
 
-    # Hyper: RhoC dominant, fibres shortening, cortex not stiffening
-    if balance > 0.3 and lsf_ratio < 0.95 and k_active < 1.2:
+    if balance > 0.3 and k_active < 1.2:
         return 'hyper'
-
-    # Failed: RhoA dominant, no fibre shortening, cortex strongly stiffened
-    if balance < -0.3 and lsf_ratio > 0.99 and k_active > 1.5:
+    if balance < -0.3 and k_active > 1.5:
         return 'failed'
-
-    # Normal: both pathways active, balanced Rho
     return 'normal'

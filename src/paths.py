@@ -17,3 +17,6 @@ BM_FIG_DIR = FIGURES_DIR / "boolean_models"
 
 PARAM_FIG_DIR = BM_FIG_DIR / "param_sweep_figs"
 PERB_FIG_DIR = BM_FIG_DIR / "perturbation_figs"
+
+# Russ Experimental Data
+EXP_DIR = PROJECT_ROOT / "CSV_Files" / "Elongation"

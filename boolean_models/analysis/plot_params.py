@@ -80,7 +80,7 @@ def plot_param_panel(ax, data, param_name, eps=0.25, metric="delta"):
         ax.set_ylim(-0.8, 0.8)
     else:
         ax.set_ylabel(f"Activation Probability ({metric})")
-        ax.set_ylin(0, 1)
+        ax.set_ylim(0, 1)
 
     ax.set_xlim(left=0)
     ax.axhline(0, color='black', linestyle='--', linewidth=0.8)

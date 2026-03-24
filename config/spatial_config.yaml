@@ -21,13 +21,13 @@ mechanics:
   # --- Cortical spring ---
   k_cortex: 1.0 # Reference stiffness
   kc_ratio: 0.1 # Compressive stiffness = 0.1 of tensile
-  rhoa_k_gain: 4.5 #RhoA above baseline can raise k_active to (1 + 8.0 * delta_rhoA) * k_cortex.
+  rhoa_k_gain: 10.0 #RhoA above baseline can raise k_active to (1 + 8.0 * delta_rhoA) * k_cortex.
     # At full activation (delta_rhoA = 0.207): k_active = 2.5 * k_cortex.
 
   # --- Stress fibre ---
   k_sf_fraction: 0.4 # Stress fibre stiffness = 40% of k_cortex.
-  rhoc_l_shrink: 0.55 # Maximum fractional shortening of L_sf under full RhoC activation
-  rhoc_max_shrink: 0.20 # Absolute cap on L_sf reduction.
+  rhoc_l_shrink: 1.5 # Maximum fractional shortening of L_sf under full RhoC activation
+  rhoc_max_shrink: 0.35 # Absolute cap on L_sf reduction.
 
   # --- Shared remodelling ---
   tau_remodel: 30.0 # Time constant for both cortex and fibre remodelling.
@@ -40,7 +40,7 @@ mechanics:
   # of ~10% generate restoring pressure comparable to spring forces.
 
   # --- Anchoring Force ---
-  k_anchor: 0.1
+  k_anchor: 0.3
   # Focal adhesion anchoring stiffness.
   # 5% of k_cortex — resists translation, allows shape change.
 

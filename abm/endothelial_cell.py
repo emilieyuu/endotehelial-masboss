@@ -46,6 +46,7 @@ class EndothelialCell:
         self.target_area = self._compute_area() # fixed, acts as reference
         self.current_area = self.target_area # dynamic, remodelled to maintain "incompressible cytoplasm"
 
+        self._init_centroid = self.centroid.copy()
         #print(f"DEBUG: Initialised Cell {self.id}: ")
         #print(self.__repr__())
     
@@ -69,7 +70,7 @@ class EndothelialCell:
             nodes.append(MembraneNode(i, pos))
 
         # Store for anchoring force — focal adhesion reference positions
-        self._init_positions = [n.pos.copy() for n in nodes]
+        #self._init_positions = [n.pos.copy() for n in nodes]
 
         return nodes
     
@@ -80,17 +81,23 @@ class EndothelialCell:
         Each spring is initialised at geometric rest length with k_cortex from config.
         """
         springs = []
+        flow_dir = np.array([1.0, 0.0])
 
         for i in range(self.n_nodes):
             # Node i connects to node (i+1) mod n_nodes — last node wraps back to node 0.
             node1 = self.nodes[i]
             node2 = self.nodes[(i + 1) % self.n_nodes]
 
-            springs.append(Spring(
+            s = Spring(
                 spring_id=i, node_1=node1, node_2=node2, # id matches its lower-indexed node.
                 rest_length=self.rest_length, k_cortex = self.k_cortex,
                 lut=lut, cfg=self.cfg
-            ))
+            )
+            # Compute and store initial alignment for population classification
+            diff = node2.pos - node1.pos
+            norm = np.linalg.norm(diff)
+            s._init_alignment = abs(np.dot(diff / norm, flow_dir)) if norm > 1e-10 else 0.0
+            springs.append(s)
 
         return springs
         
@@ -153,10 +160,11 @@ class EndothelialCell:
 
         Models focal adhesion to the substrate. 
         """
-        k_anchor = self.cfg['mechanics'].get('k_anchor', 0.05)
-        for node, init_pos in zip(self.nodes, self._init_positions):
-            displacement = node.pos - init_pos
-            node.apply_force(-k_anchor * displacement)
+        k_anchor = self.cfg['mechanics'].get('k_anchor', 0.1)
+        centroid_displacement = self.centroid - self._init_centroid
+        correction = -k_anchor * centroid_displacement
+        for node in self.nodes:
+            node.apply_force(correction)
 
     # ------------------------------------------------------------------
     # Timestep
@@ -172,7 +180,7 @@ class EndothelialCell:
             node.apply_force(shear_force)
 
         # Anchoring — prevents bulk translation, forces deformation
-        self._apply_anchoring_force()
+        #self._apply_anchoring_force()
 
         # Step 2: Spring Geometry and Tension
         for spring in self.springs:
@@ -211,8 +219,8 @@ class EndothelialCell:
         Split springs into lateral (alignment > 0.5) and 
         perpendicular  (alignment <= 0.5) populations.
         """
-        lateral  = [s for s in self.springs if s.alignment > 0.5]
-        end_face = [s for s in self.springs if s.alignment <= 0.5]
+        lateral  = [s for s in self.springs if s._init_alignment > 0.5]
+        end_face = [s for s in self.springs if s._init_alignment <= 0.5]
         return lateral, end_face
     
     def measure_shape(self) -> dict:
