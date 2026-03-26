@@ -15,6 +15,7 @@ class MembraneNode():
         self.id = node_id
         self.pos = np.array(position, dtype=float)
         self.force = np.zeros(2)
+        self.role = 'lateral'
 
     def apply_force(self, force):
         """

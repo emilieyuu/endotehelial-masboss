@@ -25,12 +25,16 @@ class EndothelialCell:
         3. Pressure forces  — area conservation (cytoplasmic incompressibility)
     """
     def __init__(self, cell_id: int, centroid: np.ndarray, lut, cfg: dict, 
-                 n_nodes: int = 12, radius: float = 10.0):
+                 n_nodes: int = 12, radius: float = 10.0, flow_direction=np.array([1.0, 0.0])):
         
         # Cell General Properties
         self.id = cell_id
         self.n_nodes = n_nodes
         self.cfg = cfg
+
+        # Normalised flow direction
+        flow = np.asarray(flow_direction, dtype=float)
+        self.flow_direction = flow / np.linalg.norm(flow)
 
         # Cell Meachnics and Geometry
         mech_cfg = self.cfg['mechanics']
@@ -40,6 +44,8 @@ class EndothelialCell:
 
         # Initialise Node Ring and Springs
         self.nodes = self._init_node_ring(centroid, n_nodes, radius)
+        self._classify_nodes()
+
         self.springs = self._init_springs(lut)
 
         # Cell Area 
@@ -71,8 +77,28 @@ class EndothelialCell:
 
         # Store for anchoring force — focal adhesion reference positions
         #self._init_positions = [n.pos.copy() for n in nodes]
-
         return nodes
+
+    
+    def _classify_nodes(self):
+        """
+        Classify each node as upstream, downstream, or lateral.
+        Must be called before step() when using role-based force application.
+        """
+        threshold = self.cfg['mechanics'].get('polar_threshold', 0.5)
+        centroid = self.centroid
+
+        for node in self.nodes:
+            radial = node.pos - centroid
+            radial_unit = radial / np.linalg.norm(radial)
+            projection = np.dot(radial_unit, self.flow_direction)
+
+            if projection > threshold:
+                node.role = 'downstream'
+            elif projection < -threshold:
+                node.role = 'upstream'
+            else:
+                node.role = 'lateral'
     
     def _init_springs(self, lut):
         """
@@ -128,43 +154,7 @@ class EndothelialCell:
         return 0.5 * abs(
             np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1))
         )
- 
-    # ------------------------------------------------------------------
-    # Forces
-    # ------------------------------------------------------------------
-    def _apply_pressure_forces(self):
-        """
-        Area-conservation pressure force — models cytoplasmic 
-        incompressibility in 2D.
-        """
-        current_area = self._compute_area()
-        centroid = self.centroid
 
-        # Internal pressure magnitude depends pressure constant and distance from target
-        # positive pressure → area below target → outward force
-        # negative pressure → area above target → inward force
-        pressure = self.k_area * (self.target_area - current_area)
-
-        # Apply force to each node along  outward normal from cemtre
-        for node in self.nodes:
-            outward = node.pos - centroid
-            norm = np.linalg.norm(outward)
-            if norm < 1e-10:
-                continue
-            norm_unit = outward / norm
-            node.apply_force(norm_unit * pressure)
-
-    def _apply_anchoring_force(self):
-        """
-        Weak restoring force towards each node's initial position. 
-
-        Models focal adhesion to the substrate. 
-        """
-        k_anchor = self.cfg['mechanics'].get('k_anchor', 0.1)
-        centroid_displacement = self.centroid - self._init_centroid
-        correction = -k_anchor * centroid_displacement
-        for node in self.nodes:
-            node.apply_force(correction)
 
     # ------------------------------------------------------------------
     # Timestep
@@ -176,7 +166,7 @@ class EndothelialCell:
         # Step 1: Shear Drag Force Onto Nodes
         centroid = self.centroid # compute centroid once
         for node in self.nodes:
-            shear_force = flow_field.get_force_on_node(node.pos, centroid)
+            shear_force = flow_field.get_force_on_node(node)
             node.apply_force(shear_force)
 
         # Anchoring — prevents bulk translation, forces deformation
@@ -191,7 +181,7 @@ class EndothelialCell:
             spring.apply_forces()
             
         # Step 4: Pressure Force Onto Nodes
-        self._apply_pressure_forces()
+        #self._apply_pressure_forces()
 
         # Step 5: Integrate Node Positions
         gamma = self.cfg['sim']['gamma']
