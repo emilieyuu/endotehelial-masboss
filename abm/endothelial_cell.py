@@ -12,7 +12,7 @@
 import numpy as np
 from abm.membrane_node import MembraneNode
 from abm.spring import Spring
-from abm.abm_helpers import measure_shape
+#from abm.abm_helpers import measure_shape
 
 class EndothelialCell: 
     """
@@ -59,7 +59,7 @@ class EndothelialCell:
         Angles spaced at 2π/n intervals, starting at angle 0 (rightmost point).
         """
         # Compute angles between nodes. 
-        angles = np.linspace(0, 2*np.pi, n_nodes, endpoint=False)  
+        angles = np.linspace(0, 2*np.pi, n_nodes, endpoint=False) + np.pi/2
         nodes = []
 
         for i, angle in enumerate(angles):

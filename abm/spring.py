@@ -201,24 +201,24 @@ class Spring:
         delta_rhoc = max(self.P_RhoC - self.lut.rhoc_rest, 0.0) 
 
         # # Only shorten L_sf is spring is currently under tension. 
-        # if self.L_current > self.L_cortex:
-        #     # Stress fibres assemble at stretched junctions 
-        #     # Compute How Much Fibre Should Shrink By
-        #     shrink = mech['rhoc_l_shrink'] * delta_rhoc * self.alignment
-        #     shrink = min(shrink, mech.get('rhoc_max_shrink', 0.25))
+        if self.L_current > self.L_cortex:
+            # Stress fibres assemble at stretched junctions 
+            # Compute How Much Fibre Should Shrink By
+            shrink = mech['rhoc_l_shrink'] * delta_rhoc * self._init_alignment
+            shrink = min(shrink, mech.get('rhoc_max_shrink', 0.25))
 
-        #     # Compute Target Shrinkage (Capped at 40% of inital length)
-        #     L_sf_target = self.L_cortex * (1.0 - shrink)
-        #     L_sf_target = max(L_sf_target, self.L_cortex * 0.4)
-        # else: 
-        #     # Spring is slack or compressed — fibres relax back toward cortex length
-        #     # This also handles the case where flow is removed: fibres dissolve
-        #     L_sf_target = self.L_cortex
+            # Compute Target Shrinkage (Capped at 40% of inital length)
+            L_sf_target = self.L_cortex * (1.0 - shrink)
+            L_sf_target = max(L_sf_target, self.L_cortex * 0.4)
+        else: 
+            # Spring is slack or compressed — fibres relax back toward cortex length
+            # This also handles the case where flow is removed: fibres dissolve
+            L_sf_target = self.L_cortex
 
-        shrink = mech['rhoc_l_shrink'] * delta_rhoc * self._init_alignment
-        shrink = min(shrink, mech.get('rhoc_max_shrink', 0.45))
-        L_sf_target = self.L_cortex * (1.0 - shrink)
-        L_sf_target = max(L_sf_target, self.L_cortex * 0.4)
+        # shrink = mech['rhoc_l_shrink'] * delta_rhoc * self._init_alignment
+        # shrink = min(shrink, mech.get('rhoc_max_shrink', 0.45))
+        # L_sf_target = self.L_cortex * (1.0 - shrink)
+        # L_sf_target = max(L_sf_target, self.L_cortex * 0.4)
 
         # First Order Lag Remodelling
         alpha = dt / mech['tau_remodel']
@@ -258,13 +258,41 @@ class Spring:
             'P_RhoC':         round(self.P_RhoC, 3),
         }
     
+    def print_spring_diagnostic(self, flow_direction=None):
+        """
+        Print each spring with its connected nodes, positions,
+        geometric vector, alignment, tension and remodelling state.
+        """
+        if flow_direction is None:
+            flow_direction = np.array([1.0, 0.0])
+
+        print(f"\n{'id':>3} {'n1':>4} {'n2':>4} "
+            f"{'pos1':>20} {'pos2':>20} "
+            f"{'vec':>16} {'align':>7} "
+            f"{'tension':>9} {'k_active':>9} {'L_sf':>7}")
+        print("-" * 110)
+
+        for s in self.springs:
+            p1 = s.node_1.pos
+            p2 = s.node_2.pos
+            diff = p2 - p1
+            pos1_str = f"({p1[0]:6.2f},{p1[1]:6.2f})"
+            pos2_str = f"({p2[0]:6.2f},{p2[1]:6.2f})"
+            vec_str  = f"({diff[0]:5.2f},{diff[1]:5.2f})"
+
+            print(f"{s.id:>3} {s.node_1.id:>4} {s.node_2.id:>4} "
+                f"{pos1_str:>20} {pos2_str:>20} "
+                f"{vec_str:>16} {s.alignment:>7.3f} "
+                f"{s.tension_total:>9.4f} {s.k_active:>9.4f} "
+                f"{s.L_sf:>7.4f}")
+        
     def __repr__(self):
         return (
             f"Spring(id={self.id} | "
-            f"L_current={self.L_current:.3f} L_cortex={self.L_cortex:.3f} L_sf={self.L_sf:.3f}\n "
+            f"L_current={self.L_current:.3f} L_cortex={self.L_cortex:.3f} L_sf={self.L_sf:.3f} | "
             f"k_active={self.k_active:.3f} | "
             f"align={self.alignment:.2f} | "
-            f"T={self.tension_total:.4f} [cortex={self.tension_cortex:.4f} sf={self.tension_sf:.4f}] | \n "
+            f"T={self.tension_total:.4f} [cortex={self.tension_cortex:.4f} sf={self.tension_sf:.4f}] | "
             f"DSP={self.DSP:.3f} TJP1={self.TJP1:.3f}) JCAD={self.JCAD:.3f} | "
             f"RhoA={self.P_RhoA:.3f} RhoC={self.P_RhoC:.3f})"
         )
