@@ -57,6 +57,7 @@ class MembraneNode():
             f"MembraneNode(id={self.id} | "
             f"pos={self.pos.round(2)} | "
             f"force={self.force.round(4)})"
+            f"role={self.role.round(4)})"
         )
 
 

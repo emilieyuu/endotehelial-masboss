@@ -8,7 +8,7 @@
 #               only develops along the flow axis
 
 import numpy as np
-from abm.abm_helpers import *
+from abm.abm_helpers import bilinear_tension, get_protein_recruitment
 
 
 class Spring: 
@@ -43,7 +43,6 @@ class Spring:
         self.lut = lut
         self.cfg = cfg
         self.id = spring_id
-
         self.node_1 = node_1
         self.node_2 = node_2
 
@@ -57,7 +56,7 @@ class Spring:
         self.k_sf = k_cortex * sf_fraction # fixed stiffness
         self.L_sf = rest_length # dynamic rest length, shortened by RhoA
 
-        # Instantaneous Geomtry –Uupdated at Each Step 
+        # Instantaneous Geometry – Updated at Each Step 
         self.L_current = rest_length
         self.unit_vec = np.zeros(2)
         self.alignment = 0.0
@@ -76,10 +75,9 @@ class Spring:
     def update_geometry(self, flow_direction):
         """ 
         Recompute all geometry from current node positions, then 
-        compute tension for both subsystems (from previous step). 
+        compute tension for both subsystems. 
 
         Called first in every timestep.
-        Tension values computed here are what update_signalling reads.
         """
 
         # Compute and update length (norm) of spring
@@ -215,11 +213,6 @@ class Spring:
             # This also handles the case where flow is removed: fibres dissolve
             L_sf_target = self.L_cortex
 
-        # shrink = mech['rhoc_l_shrink'] * delta_rhoc * self._init_alignment
-        # shrink = min(shrink, mech.get('rhoc_max_shrink', 0.45))
-        # L_sf_target = self.L_cortex * (1.0 - shrink)
-        # L_sf_target = max(L_sf_target, self.L_cortex * 0.4)
-
         # First Order Lag Remodelling
         alpha = dt / mech['tau_remodel']
         self.L_sf += alpha * (L_sf_target - self.L_sf)
@@ -236,63 +229,32 @@ class Spring:
     # ------------------------------------------------------------------
     # Diagnostics & Debugging
     # ------------------------------------------------------------------
-    def get_state(self):
-        """
-        Full state snapshot for logging and debugging.
-        Returns every meaningful variable in one flat dict.
-        """
+    def get_state(self) -> dict:
+        """Flat state snapshot for logging."""
         return {
             'id':             self.id,
-            'L_current':      round(self.L_current, 4),
-            'L_cortex':       round(self.L_cortex, 4),
-            'L_sf':           round(self.L_sf, 4),
-            'k_active':       round(self.k_active, 4),
-            'alignment':      round(self.alignment, 3),
-            'tension_total':        round(self.tension_total, 4),
+            'L_current':      round(self.L_current,      4),
+            'L_cortex':       round(self.L_cortex,       4),
+            'L_sf':           round(self.L_sf,           4),
+            'k_active':       round(self.k_active,       4),
+            'alignment':      round(self.alignment,      3),
+            'init_alignment': round(self._init_alignment,3),
             'tension_cortex': round(self.tension_cortex, 4),
-            'tension_sf':     round(self.tension_sf, 4),
-            'DSP':            round(self.DSP, 3),
-            'TJP1':           round(self.TJP1, 3),
-            'JCAD':           round(self.JCAD, 3),
-            'P_RhoA':         round(self.P_RhoA, 3),
-            'P_RhoC':         round(self.P_RhoC, 3),
+            'tension_sf':     round(self.tension_sf,     4),
+            'tension_total':  round(self.tension_total,  4),
+            'DSP':            round(self.DSP,            3),
+            'TJP1':           round(self.TJP1,           3),
+            'JCAD':           round(self.JCAD,           3),
+            'P_RhoA':         round(self.P_RhoA,         3),
+            'P_RhoC':         round(self.P_RhoC,         3),
         }
-    
-    def print_spring_diagnostic(self, flow_direction=None):
-        """
-        Print each spring with its connected nodes, positions,
-        geometric vector, alignment, tension and remodelling state.
-        """
-        if flow_direction is None:
-            flow_direction = np.array([1.0, 0.0])
 
-        print(f"\n{'id':>3} {'n1':>4} {'n2':>4} "
-            f"{'pos1':>20} {'pos2':>20} "
-            f"{'vec':>16} {'align':>7} "
-            f"{'tension':>9} {'k_active':>9} {'L_sf':>7}")
-        print("-" * 110)
-
-        for s in self.springs:
-            p1 = s.node_1.pos
-            p2 = s.node_2.pos
-            diff = p2 - p1
-            pos1_str = f"({p1[0]:6.2f},{p1[1]:6.2f})"
-            pos2_str = f"({p2[0]:6.2f},{p2[1]:6.2f})"
-            vec_str  = f"({diff[0]:5.2f},{diff[1]:5.2f})"
-
-            print(f"{s.id:>3} {s.node_1.id:>4} {s.node_2.id:>4} "
-                f"{pos1_str:>20} {pos2_str:>20} "
-                f"{vec_str:>16} {s.alignment:>7.3f} "
-                f"{s.tension_total:>9.4f} {s.k_active:>9.4f} "
-                f"{s.L_sf:>7.4f}")
-        
     def __repr__(self):
         return (
             f"Spring(id={self.id} | "
-            f"L_current={self.L_current:.3f} L_cortex={self.L_cortex:.3f} L_sf={self.L_sf:.3f} | "
-            f"k_active={self.k_active:.3f} | "
-            f"align={self.alignment:.2f} | "
-            f"T={self.tension_total:.4f} [cortex={self.tension_cortex:.4f} sf={self.tension_sf:.4f}] | "
-            f"DSP={self.DSP:.3f} TJP1={self.TJP1:.3f}) JCAD={self.JCAD:.3f} | "
-            f"RhoA={self.P_RhoA:.3f} RhoC={self.P_RhoC:.3f})"
-        )
+            f"L={self.L_current:.3f} L0={self.L_cortex:.3f} Lsf={self.L_sf:.3f} | "
+            f"k={self.k_active:.3f} | "
+            f"align={self.alignment:.2f} init={self._init_alignment:.2f} | "
+            f"T={self.tension_total:.4f} "
+            f"[cortex={self.tension_cortex:.4f} sf={self.tension_sf:.4f}] | "
+            f"RhoA={self.P_RhoA:.3f} RhoC={self.P_RhoC:.3f})")
