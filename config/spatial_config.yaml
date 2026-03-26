@@ -12,9 +12,9 @@ sim:
 
 # Protein-Specifc Hill Parameters
 hill_params: # Maps to protein recruitment
-  DSP: {K: 0.05, n: 3, p_max: 0.67, knocked_out: False}
-  TJP1: {K: 0.03, n: 2, p_max: 0.67, knocked_out: False}
-  JCAD: {K: 0.04, n: 4, p_max: 0.67, knocked_out: False}
+  DSP: {K: 0.8, n: 3, p_max: 0.67, knocked_out: False}
+  TJP1: {K: 0.5, n: 2, p_max: 0.67, knocked_out: False}
+  JCAD: {K: 1.0, n: 4, p_max: 0.67, knocked_out: False}
 
 # Parameter for tension calculation
 mechanics:
@@ -25,7 +25,7 @@ mechanics:
     # At full activation (delta_rhoA = 0.207): k_active = 2.5 * k_cortex.
 
   # --- Stress fibre ---
-  k_sf_fraction: 0.4 # Stress fibre stiffness = 40% of k_cortex.
+  k_sf_fraction: 0.69 # Stress fibre stiffness = 40% of k_cortex.
   rhoc_l_shrink: 1.5 # Maximum fractional shortening of L_sf under full RhoC activation
   rhoc_max_shrink: 0.35 # Absolute cap on L_sf reduction.
 
@@ -34,15 +34,9 @@ mechanics:
   # alpha = dt / tau = 0.1 / 100 = 0.001 per step.
   # At this rate, 63% remodelling takes 100 steps, 95% takes ~300 steps.
 
-  # --- Area conservation ---
-  k_area: 0.3
-  # Soft constraint. At k_area = 1.5 and k_cortex = 1.0, area changes
-  # of ~10% generate restoring pressure comparable to spring forces.
+  polar_threshold: 0.9
+  k_area: 0.1
 
-  # --- Anchoring Force ---
-  k_anchor: 0.3
-  # Focal adhesion anchoring stiffness.
-  # 5% of k_cortex — resists translation, allows shape change.
 
 
  
