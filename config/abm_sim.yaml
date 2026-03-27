@@ -63,6 +63,6 @@ perturbations:
   WT: {}
   DSP_KO: {DSP: {knocked_out: True}}
   TJP1_KO: {TJP1: {knocked_out: True}}
-  JCAD_KO: {JCAD: {knocket_out: True}}
+  JCAD_KO: {JCAD: {knocked_out: True}}
   DSP_JCAD_DKO: {DSP: {knocked_out: True}, JCAD: {knocked_out: True}}
   TJP1_JCAD_DKO: {TJP1: {knocked_out: True}, JCAD: {knocked_out: True}}

@@ -17,6 +17,7 @@ exp_targets:
   WT: 5.403
   DSP_KO: 7.047
   TJP1_KO: 3.371
+  JCAD_KO: 5.437
   DSP_JCAD_DKO: 6.224
   TJP1_JCAD_DKO: 4.040
 
