@@ -1,4 +1,4 @@
-#boolean_models/scripts/run_param_sweep.py
+# boolean_models/scripts/run_maboss.py
 #
 # Run Full MaBoSS pipeline: Perturbation + Param Sweep
 

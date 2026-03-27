@@ -14,6 +14,7 @@ sim:
   gamma: 3.0 # viscous drag — mechanical equilibration ~3 min
   n_nodes: 16
   radius: 12 # units → 36 µm, area ~3968 µm²
+  n_steps: 1000
 
 # TIME MAPPING
 # dt = 0.1           →  6 seconds
@@ -30,13 +31,6 @@ hill_params:
   TJP1: {K: 0.5, n: 2, p_max: 0.67, knocked_out: False}
   JCAD: {K: 1.0, n: 4, p_max: 0.67, knocked_out: False}
 
-  # Pertubations: 
-  perturbation:
-    WT: {}
-    DSP-KO: {DSP: {knocked_out: True}}
-    TJP1-KO: {TJP1: {knocked_out: True}}
-    DSP-JCAD-DKO: {DSP: {knocked_out: True}, JCAD: {knocked_out: True}}
-    TJP1-JCAD-DKO: {TJP1: {knocked_out: True}, JCAD: {knocked_out: True}}
 
 # Mechanics
 mechanics:
@@ -63,3 +57,12 @@ mechanics:
 
   # Geometry
   polar_threshold: 0.85
+
+  # Pertubations: 
+perturbations:
+  WT: {}
+  DSP_KO: {DSP: {knocked_out: True}}
+  TJP1_KO: {TJP1: {knocked_out: True}}
+  JCAD_KO: {JCAD: {knocket_out: True}}
+  DSP_JCAD_DKO: {DSP: {knocked_out: True}, JCAD: {knocked_out: True}}
+  TJP1_JCAD_DKO: {TJP1: {knocked_out: True}, JCAD: {knocked_out: True}}

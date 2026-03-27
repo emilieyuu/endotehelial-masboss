@@ -17,10 +17,10 @@ def save_df_to_csv(df, directory, base_name, timestamp=False):
     print(f"DEBUG: File {path.name} successfully written to directory: {directory}")
 
 
-def generate_ko_model(base_model, mutation):
+def generate_ko_model(base_model, mutations):
         m = base_model.copy()
 
-        for node, state in mutation.items():
+        for node, state in mutations.items():
             m.mutate(node, state)
 
         return m

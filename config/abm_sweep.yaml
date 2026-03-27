@@ -4,6 +4,7 @@ experiment: "abm_parameter_sweep"
 
 sweep: 
   n_steps: 1500 # 150 minutes
+  result_dir: "ABM_RESULT_DIR"
 
 # Range of values with parameters
 param_ranges: 
@@ -14,14 +15,14 @@ param_ranges:
 # Experiment AR targets for scoring
 exp_targets: 
   WT: 5.403
-  DSP-KO: 7.047
-  TJP1-KO: 3.371
-  DSP-JCAD-DKO: 6.224
-  TJP1-JCAD-DKO: 4.040
+  DSP_KO: 7.047
+  TJP1_KO: 3.371
+  DSP_JCAD_DKO: 6.224
+  TJP1_JCAD_DKO: 4.040
 
 # Ordering Constraints
 ordering_constraints:
-  - [TJP1-KO,       WT]
-  - [WT,            DSP-KO]
-  - [DSP-JCAD-DKO,  DSP-KO]
-  - [TJP1-KO,       TJP1-JCAD-DKO]
+  - [TJP1_KO, WT]
+  - [WT, DSP_KO]
+  - [DSP_JCAD_DKO, DSP_KO]
+  - [TJP1_KO, TJP1_JCAD_DKO]

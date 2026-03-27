@@ -329,8 +329,8 @@ class EndothelialCell:
         polar_rhoa   = float(np.mean([s.P_RhoA for s in polar]))   if polar   else 0.0
 
         # Mechanics — tension by subsystem
-        t_cortex = float(np.mean([s.tension_cortex for s in self.springs]))
-        t_sf     = float(np.mean([s.tension_sf     for s in self.springs]))
+        mean_t_cortex = float(np.mean([s.tension_cortex for s in self.springs]))
+        mean_t_sf     = float(np.mean([s.tension_sf     for s in self.springs]))
 
         # Remodelling — mean state across all springs
         mean_k_active  = float(np.mean([s.k_active for s in self.springs]))
@@ -339,25 +339,33 @@ class EndothelialCell:
 
         return {
             'cell_id': self.id,
-            'metrics': {
-                'ar':          shape['ar'],
-                'orientation': shape['orientation'],
-                'circularity': shape['circularity'],
-                'area_err':    round(self.current_area / self.target_area, 4),
-            },
-            'signalling': {
-                'rho_balance':  round(rho_balance,  3),
-                'lateral_rhoc': round(lateral_rhoc, 3),
-                'polar_rhoa':   round(polar_rhoa,   3),
-            },
-            'mechanics': {
-                't_cortex': round(t_cortex, 4),
-                't_sf':     round(t_sf,     4),
-            },
-            'remodelling': {
-                'mean_k_active':  round(mean_k_active,  4),
-                'mean_lsf_ratio': round(mean_lsf_ratio, 4),
-            },
+            'ar':          shape['ar'],
+            'orientation': shape['orientation'],
+            'area_err':    round(self.current_area / self.target_area, 4),
+            'rho_balance':  round(rho_balance,  3),
+            'mean_t_cortex': round(mean_t_cortex, 4),
+            'mean_t_sf':     round(mean_t_sf,     4),
+            'mean_k_active':  round(mean_k_active,  4),
+            'mean_lsf_ratio': round(mean_lsf_ratio, 4),
+            # 'metrics': {
+            #     'ar':          shape['ar'],
+            #     'orientation': shape['orientation'],
+            #     'circularity': shape['circularity'],
+            #     'area_err':    round(self.current_area / self.target_area, 4),
+            # },
+            # 'signalling': {
+            #     'rho_balance':  round(rho_balance,  3),
+            #     'lateral_rhoc': round(lateral_rhoc, 3),
+            #     'polar_rhoa':   round(polar_rhoa,   3),
+            # },
+            # 'mechanics': {
+            #     'mean_t_cortex': round(mean_t_cortex, 4),
+            #     'mean_t_sf':     round(mean_t_sf,     4),
+            # },
+            # 'remodelling': {
+            #     'mean_k_active':  round(mean_k_active,  4),
+            #     'mean_lsf_ratio': round(mean_lsf_ratio, 4),
+            # },
         }
 
     def __repr__(self):
@@ -366,8 +374,8 @@ class EndothelialCell:
             f"EndothelialCell(id={self.id} | "
             f"n={self.n_nodes} | "
             f"centroid={self.centroid.round(2)} | "
-            f"ar={s['metrics']['ar']:.2f} | "
-            f"area_err={s['metrics']['area_err']:.3f} | "
-            f"rho_bal={s['signalling']['rho_balance']:+.3f} | "
-            f"lsf={s['remodelling']['mean_lsf_ratio']:.3f} | "
-            f"t_sf={s['mechanics']['t_sf']:.4f})")
+            f"ar={s['ar']:.2f} | "
+            f"area_err={s['area_err']:.3f} | "
+            f"rho_bal={s['rho_balance']:+.3f} | "
+            f"lsf={s['mean_lsf_ratio']:.3f} | "
+            f"t_sf={s['mean_t_sf']:.4f})")

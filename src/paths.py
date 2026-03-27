@@ -20,9 +20,8 @@ PARAM_FIG_DIR = BM_FIG_DIR / "param_sweep_figs"
 PERB_FIG_DIR = BM_FIG_DIR / "perturbation_figs"
 
 # ABM specific
-ABM_RESULTS_DIR = RESULTS_DIR / "abm"
-ABM_FIG_DIR = FIGURES_DIR / "abm"
-ABM_SWEEP_DIR = RESULTS_DIR / "abm_sweep"
+ABM_SIM_RES_DIR = RESULTS_DIR / "abm_sim"
+ABM_SWEEP_RES_DIR = RESULTS_DIR / "abm_sweep"
 
 # Russ Experimental Data
 EXP_DIR = PROJECT_ROOT / "CSV_Files" / "Elongation"
