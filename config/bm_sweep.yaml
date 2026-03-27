@@ -1,5 +1,7 @@
+# config/ bm_sweep.yaml
+
 # Metadata
-experiment: "parameter_sweep"
+experiment: "bm_parameter_sweep"
 
 ranges:
   amp:          { start: 0.0, stop: 50.0, step: 2.5 }

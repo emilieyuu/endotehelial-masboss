@@ -39,6 +39,7 @@ class FlowField():
     # ------------------------------------------------------------------
 
     def get_force_on_node(self, node):
+
         if node.role == 'upstream':
             return -self.direction * self.magnitude
         elif node.role == 'downstream':

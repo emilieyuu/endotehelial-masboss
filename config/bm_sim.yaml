@@ -1,5 +1,7 @@
+# config/ bm_sim.yaml
+
 # Metadata
-experiment: "perturbation_simulation"
+experiment: "bm_perturbation_simulation"
 
 # Path Configuration
 model:

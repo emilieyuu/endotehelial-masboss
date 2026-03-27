@@ -1,0 +1,27 @@
+# config/abm_sweep.yaml
+
+experiment: "abm_parameter_sweep"
+
+sweep: 
+  n_steps: 1500 # 150 minutes
+
+# Range of values with parameters
+param_ranges: 
+  f_magnitude: [8.0, 10.0, 12.0, 14.0]
+  rhoa_k_gain: [8.0, 10.0, 12.0, 15.0]
+  rhoc_protrusion_gain: [3.0, 4.0, 5.0, 6.0]
+
+# Experiment AR targets for scoring
+exp_targets: 
+  WT: 5.403
+  DSP-KO: 7.047
+  TJP1-KO: 3.371
+  DSP-JCAD-DKO: 6.224
+  TJP1-JCAD-DKO: 4.040
+
+# Ordering Constraints
+ordering_constraints:
+  - [TJP1-KO,       WT]
+  - [WT,            DSP-KO]
+  - [DSP-JCAD-DKO,  DSP-KO]
+  - [TJP1-KO,       TJP1-JCAD-DKO]

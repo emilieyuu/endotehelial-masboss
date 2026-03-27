@@ -53,8 +53,10 @@ class Spring:
 
         # Stress Fibre Subsystem
         sf_fraction = cfg['mechanics'].get('k_sf_fraction', 0.4)
+        a_sf_rest = cfg['mechanics'].get('a_sf_rest', 1.0)
         self.k_sf = k_cortex * sf_fraction # fixed stiffness
-        self.L_sf = rest_length # dynamic rest length, shortened by RhoA
+        self.L_sf = rest_length * a_sf_rest
+        #self.L_sf = rest_length # dynamic rest length, shortened by RhoA
 
         # Instantaneous Geometry – Updated at Each Step 
         self.L_current = rest_length
@@ -103,12 +105,19 @@ class Spring:
         )
 
         # Stress Fibre Tension 
-        # Rest length is L_sf (RhoC-remodelled), stiffness is k_sf (fixed)
         sf_extension = self.L_current - self.L_sf
-        self.tension_sf = max(
-            self.k_sf * sf_extension * self._init_alignment, # weighted by alignment (lateral highest)
-            0.0 # fibres do not generate compressive force (only pull, no pushh)
-        )
+        if self.L_sf < self.L_cortex * (self.cfg['mechanics'].get('a_sf_rest', 1.0) - 1e-6):
+            self.tension_sf = max(
+                self.k_sf * sf_extension * self._init_alignment, 0.0
+            )
+        else:
+            self.tension_sf = 0.0
+        # # Rest length is L_sf (RhoC-remodelled), stiffness is k_sf (fixed)
+        # sf_extension = self.L_current - self.L_sf
+        # self.tension_sf = max(
+        #     self.k_sf * sf_extension * self._init_alignment, # weighted by alignment (lateral highest)
+        #     0.0 # fibres do not generate compressive force (only pull, no pushh)
+        # )
 
         self.tension_total = self.tension_cortex + self.tension_sf
 
@@ -149,7 +158,11 @@ class Spring:
         """
 
         # Compute Mechanical Input
-        tensile = max(self.tension_total, 0.0) # no recruitment in compressed junctions
+        #tensile = max(self.tension_total, 0.0) # no recruitment in compressed junctions
+
+        # CHANGE: junction protein do not sense interal SF tension, only mechanical load
+        # on cortex
+        tensile = max(self.tension_cortex, 0.0)
         tau_dsp  = tensile
         tau_tjp1 = tensile #abs(self.tension_total) * (1.0 - self.alignment) 
         tau_jcad = tensile * self.alignment
@@ -197,21 +210,37 @@ class Spring:
 
         # Compute RhoC Activity Above Baseline
         delta_rhoc = max(self.P_RhoC - self.lut.rhoc_rest, 0.0) 
+        rhoc_max    = 0.365 
+        rhoc_fraction = delta_rhoc / rhoc_max
 
-        # # Only shorten L_sf is spring is currently under tension. 
-        if self.L_current > self.L_cortex:
-            # Stress fibres assemble at stretched junctions 
-            # Compute How Much Fibre Should Shrink By
-            shrink = mech['rhoc_l_shrink'] * delta_rhoc * self._init_alignment
-            shrink = min(shrink, mech.get('rhoc_max_shrink', 0.25))
+        a_sf_rest     = float(mech.get('a_sf_rest',     1.0))
+        a_sf_baseline = float(mech.get('a_sf_baseline', 0.81))
+        a_sf_min      = float(mech.get('a_sf_min',      0.55))
 
-            # Compute Target Shrinkage (Capped at 40% of inital length)
-            L_sf_target = self.L_cortex * (1.0 - shrink)
-            L_sf_target = max(L_sf_target, self.L_cortex * 0.4)
-        else: 
-            # Spring is slack or compressed — fibres relax back toward cortex length
-            # This also handles the case where flow is removed: fibres dissolve
-            L_sf_target = self.L_cortex
+        a_sf_target = (a_sf_rest
+                   - (a_sf_rest - a_sf_min)
+                   * rhoc_fraction
+                   * self._init_alignment)
+
+        # Hard floor — fibres cannot contract below a_sf_min
+        a_sf_target = max(a_sf_target, a_sf_min)
+
+        L_sf_target = self.L_cortex * a_sf_target
+
+        # # # Only shorten L_sf is spring is currently under tension. 
+        # if self.L_current > self.L_cortex:
+        #     # Stress fibres assemble at stretched junctions 
+        #     # Compute How Much Fibre Should Shrink By
+        #     shrink = mech['rhoc_l_shrink'] * delta_rhoc * self._init_alignment
+        #     shrink = min(shrink, mech.get('rhoc_max_shrink', 0.25))
+
+        #     # Compute Target Shrinkage (Capped at 40% of inital length)
+        #     L_sf_target = self.L_cortex * (1.0 - shrink)
+        #     L_sf_target = max(L_sf_target, self.L_cortex * 0.4)
+        # else: 
+        #     # Spring is slack or compressed — fibres relax back toward cortex length
+        #     # This also handles the case where flow is removed: fibres dissolve
+        #     L_sf_target = self.L_cortex
 
         # First Order Lag Remodelling
         alpha = dt / mech['tau_remodel']

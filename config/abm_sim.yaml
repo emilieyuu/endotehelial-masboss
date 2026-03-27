@@ -1,0 +1,65 @@
+# config/abm_sim.yaml
+
+# Metadata
+experiment: "abm_simulation"
+
+# Files
+files: 
+  # Lookup Table
+  recruitment_csv: "param_sweep_Joint_Recr_Sweep.csv"
+
+# Simulation
+sim: 
+  dt: 0.1 # 6 seconds per step
+  gamma: 3.0 # viscous drag — mechanical equilibration ~3 min
+  n_nodes: 16
+  radius: 12 # units → 36 µm, area ~3968 µm²
+
+# TIME MAPPING
+# dt = 0.1           →  6 seconds
+# tau_remodel = 30   →  30 minutes
+# 300 steps          →  30 minutes  (63% remodelling)
+# 900 steps          →  90 minutes  (95% remodelling)
+# 1500 steps         →  150 minutes (sweep standard run)
+# 14400 steps        →  24 hours    (full experimental run)
+
+
+# Signalling – Hill Function Params
+hill_params: 
+  DSP: {K: 0.8, n: 3, p_max: 0.67, knocked_out: False}
+  TJP1: {K: 0.5, n: 2, p_max: 0.67, knocked_out: False}
+  JCAD: {K: 1.0, n: 4, p_max: 0.67, knocked_out: False}
+
+  # Pertubations: 
+  perturbation:
+    WT: {}
+    DSP-KO: {DSP: {knocked_out: True}}
+    TJP1-KO: {TJP1: {knocked_out: True}}
+    DSP-JCAD-DKO: {DSP: {knocked_out: True}, JCAD: {knocked_out: True}}
+    TJP1-JCAD-DKO: {TJP1: {knocked_out: True}, JCAD: {knocked_out: True}}
+
+# Mechanics
+mechanics:
+  # Cortical spring 
+  k_cortex: 1.0 # Reference stiffness (normalised)
+  kc_ratio: 0.1 # Compressive stiffness = 10% of tensile
+  rhoa_k_gain: 10.0 # RhoA stiffening gain
+
+  # Stress fibre 
+  k_sf_fraction: 0.69 # SF/cortex stiffness ratio (Jakob: 20.2/29.1)
+  a_sf_rest:     1.0     #no fibres assembled at t=0
+  a_sf_baseline: 0.81   # physiological SF contraction at rest (Jakob et al.)
+  a_sf_min:      0.55   # maximum contraction at full RhoC 
+
+  # Remodelling
+  tau_remodel: 30.0 # Time constant – 30 minutes
+
+  # Flow and protrusion
+  f_magnitude: 10
+  rhoc_protrusion_gain: 4.0
+
+  # Area Conservation
+  k_area: 0.5
+
+  # Geometry
+  polar_threshold: 0.85

@@ -23,7 +23,7 @@ class EndothelialCell:
         - Shape (AR, orientation) emerges from Rho balance, not imposed externally
     """
     def __init__(self, cell_id: int, centroid: np.ndarray, lut, cfg: dict, 
-                 n_nodes: int = 12, radius: float = 10.0, flow_direction=None):
+                 n_nodes: int = 16, radius: float = 12.0, flow_direction=None):
         
         # Cell General Properties
         self.id = cell_id
@@ -76,19 +76,30 @@ class EndothelialCell:
         Label each node upstream, downstream, or lateral based on its
         radial projection onto the flow axis.
         """
-        threshold =  0.9 #float(self.cfg['mechanics'].get('polar_threshold', 0.85))
-        centroid = self.centroid
+        #threshold =  0.9 #float(self.cfg['mechanics'].get('polar_threshold', 0.85))
+        centroid    = self.centroid
+        projections = []
 
         for node in self.nodes:
             radial = node.pos - centroid
             radial_unit = radial / np.linalg.norm(radial)
             projection = np.dot(radial_unit, self.flow_direction)
+            projections.append((projection, node))
             #print(projection)
 
-            if projection > threshold:
-                node.role = 'downstream'
-            elif projection < -threshold:
+        # Sort by projection
+        projections.sort(key=lambda x: x[0])
+
+        # Most negative projection = upstream (faces into flow)
+        # Most positive projection = downstream (faces away from flow)
+        upstream_node   = projections[0][1]
+        downstream_node = projections[-1][1]
+
+        for proj, node in projections:
+            if node is upstream_node:
                 node.role = 'upstream'
+            elif node is downstream_node:
+                node.role = 'downstream'
             else:
                 node.role = 'lateral'
     
@@ -165,6 +176,37 @@ class EndothelialCell:
                 continue
             node.apply_force((outward / norm) * pressure)
 
+    def _apply_sf_protrusion(self): 
+        """
+        Stres Fibre driven protrusion  membrane protrusion at upstream/downstream poles. 
+
+        Stress fibres extend along flow axis to polar poles, where
+        continued actin assemply protrudes the membrane outward. 
+
+        Reads mean RhoC activity aboce rest from neighbouring
+        spring at poles, and applies a proportional outward force at each pole node. 
+
+        Force direction: outwards from centroid. 
+        """
+        gain = self.cfg['mechanics'].get('rhoc_protrusion_gain', 2.0)
+
+        for node in self.nodes:
+            if node.role not in ('upstream', 'downstream'):
+                continue
+
+            neighbours = [s for s in self.springs
+                          if s.node_1 is node or s.node_2 is node]
+            
+            # Read RhoC signal from springs neighbouring this pole node
+            delta_rhoc = float(np.mean([
+                max(s.P_RhoC - self.lut.rhoc_rest, 0.0)
+                for s in neighbours
+            ]))
+
+            outward = node.pos - self.centroid
+            outward_unit = outward / np.linalg.norm(outward)
+
+            node.apply_force(outward_unit * gain * delta_rhoc)
 
     # ------------------------------------------------------------------
     # Timestep
@@ -186,6 +228,7 @@ class EndothelialCell:
             node.apply_force(shear_force)
 
         self._apply_pressure()
+        self._apply_sf_protrusion()
 
         # Step 2: Spring geometry — recompute length, alignment, tension
         for spring in self.springs:
@@ -222,9 +265,22 @@ class EndothelialCell:
         (perpendicular to flow) using initial alignment.
         Uses same threshold as _classify_nodes for consistency.
         """
-        threshold = float(self.cfg['mechanics'].get('polar_threshold', 0.9))
-        lateral   = [s for s in self.springs if s._init_alignment >  threshold]
-        polar     = [s for s in self.springs if s._init_alignment <= threshold]
+        # threshold = float(self.cfg['mechanics'].get('polar_threshold', 0.9))
+        # lateral   = [s for s in self.springs if s._init_alignment >  threshold]
+        # polar     = [s for s in self.springs if s._init_alignment <= threshold]
+        # return lateral, polar
+        """
+        Split springs into lateral and polar based on node roles.
+        Polar springs connect to the upstream or downstream pole node.
+        Lateral springs connect only to lateral nodes.
+        """
+        pole_nodes = {n for n in self.nodes if n.role in ('upstream', 'downstream')}
+        
+        polar   = [s for s in self.springs
+                if s.node_1 in pole_nodes or s.node_2 in pole_nodes]
+        lateral = [s for s in self.springs
+                if s.node_1 not in pole_nodes and s.node_2 not in pole_nodes]
+        
         return lateral, polar
     
     def measure_shape(self) -> dict:
