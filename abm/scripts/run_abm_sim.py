@@ -7,22 +7,11 @@ from datetime import datetime
 
 from abm.flow_field import FlowField
 from abm.endothelial_cell import EndothelialCell
+from src.utils import save_df_to_csv
 
 # --------------------------------------------------
 # Helpers
 # --------------------------------------------------
-def save_df_to_csv(df, directory, base_name, ts=False):
-    directory.mkdir(parents=True, exist_ok=True)
-
-    if ts:
-        ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        file_name = f"{base_name}_{ts}.csv"
-    else: 
-         file_name = f"{base_name}.csv"
-
-    path = directory / file_name
-    df.to_csv(path, index=False)
-    print(f">>> INFO: File {path.name} successfully written to directory: {directory}")
 
 def get_perb_cfg(cfg_base, knockouts):
     """
@@ -118,7 +107,7 @@ def run_abm_sim(cfg, lut, n_steps=None, result_dir=None):
     spring_ss_rows   = []
 
     for name, perb, in perbs.items(): 
-        print(f">>> INFO: Running abm simulation perturbation: {name} ({n_steps} steps).")
+        #print(f">>> INFO: Running abm simulation perturbation: {name} ({n_steps} steps).")
 
         perb_cfg = get_perb_cfg(cfg_base=cfg, knockouts=perbs[name])
         result = run_abm_sim_single(perb_cfg, lut, name, n_steps)
@@ -129,7 +118,7 @@ def run_abm_sim(cfg, lut, n_steps=None, result_dir=None):
         spring_ss_rows.append(result['spring_final'])
 
 
-    print(f">>> INFO: All perturbations completed successfully.")
+   # print(f">>> INFO: All perturbations completed successfully.")
 
     timeseries_df  = pd.concat(cell_histories,   ignore_index=True)
     spring_ts_df   = pd.concat(spring_histories, ignore_index=True)

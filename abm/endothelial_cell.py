@@ -190,23 +190,45 @@ class EndothelialCell:
         """
         gain = self.cfg['mechanics'].get('rhoc_protrusion_gain', 2.0)
 
+        lateral, _ = self._spring_populations()
+
+        # Read RhoC from lateral springs — these have the highest RhoC signal
+        # Biology: SF contractile signal propagates from lateral junctions
+        # to polar focal adhesions where actin polymerisation occurs
+        if not lateral:
+            return
+
+        delta_rhoc = float(np.mean([
+            max(s.P_RhoC - self.lut.rhoc_rest, 0.0)
+            for s in lateral
+        ]))
+        if delta_rhoc < 1e-6:
+            return
+
         for node in self.nodes:
             if node.role not in ('upstream', 'downstream'):
                 continue
-
-            neighbours = [s for s in self.springs
-                          if s.node_1 is node or s.node_2 is node]
-            
-            # Read RhoC signal from springs neighbouring this pole node
-            delta_rhoc = float(np.mean([
-                max(s.P_RhoC - self.lut.rhoc_rest, 0.0)
-                for s in neighbours
-            ]))
-
-            outward = node.pos - self.centroid
+            outward      = node.pos - self.centroid
             outward_unit = outward / np.linalg.norm(outward)
-
             node.apply_force(outward_unit * gain * delta_rhoc)
+
+        # for node in self.nodes:
+        #     if node.role not in ('upstream', 'downstream'):
+        #         continue
+
+        #     neighbours = [s for s in self.springs
+        #                   if s.node_1 is node or s.node_2 is node]
+            
+        #     # Read RhoC signal from springs neighbouring this pole node
+        #     delta_rhoc = float(np.mean([
+        #         max(s.P_RhoC - self.lut.rhoc_rest, 0.0)
+        #         for s in neighbours
+        #     ]))
+
+        #     outward = node.pos - self.centroid
+        #     outward_unit = outward / np.linalg.norm(outward)
+
+        #     node.apply_force(outward_unit * gain * delta_rhoc)
 
     # ------------------------------------------------------------------
     # Timestep

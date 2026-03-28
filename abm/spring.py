@@ -190,11 +190,29 @@ class Spring:
         """
         mech = self.cfg['mechanics']
 
-        # Compute RhoA Activity Above Baseline
-        delta_rhoa = max(self.P_RhoA - self.lut.rhoa_rest, 0.0) 
+        # RhoA contribution — isotropic cortical stiffening
+        delta_rhoa = max(self.P_RhoA - self.lut.rhoa_rest, 0.0)
+        k_target = self.k_cortex * (
+            1.0 + mech['rhoa_k_gain'] * delta_rhoa
+        )
 
-        # Compute Target Stiffness
-        k_target = self.k_cortex * (1.0 + mech['rhoa_k_gain'] * delta_rhoa)
+        # RhoC contribution — axial SF pretension on flow-aligned springs
+        # Weighted by _init_alignment: lateral springs (alignment≈1) get full effect
+        # polar springs (alignment≈0.2) get minimal effect
+        # delta_rhoc = max(self.P_RhoC - self.lut.rhoc_rest, 0.0)
+        # k_rhoc_target = self.k_cortex * (
+        #     1.0 + mech.get('rhoc_k_gain', 5.0) * delta_rhoc * self._init_alignment
+        # )
+
+        # # Combined target — both pathways contribute to effective stiffness
+        # k_target = max(k_rhoa_target, k_rhoc_target)
+
+
+        # Compute RhoA Activity Above Baseline
+        # delta_rhoa = max(self.P_RhoA - self.lut.rhoa_rest, 0.0) 
+
+        # # Compute Target Stiffness
+        # k_target = self.k_cortex * (1.0 + mech['rhoa_k_gain'] * delta_rhoa)
 
         # First Order Lag Remodelling
         alpha = dt / mech['tau_remodel'] # how much 
