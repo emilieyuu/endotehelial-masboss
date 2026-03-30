@@ -1,4 +1,4 @@
-# abm_v2/stress_fibre.py
+# abm/stress_fibre.py
 #
 # Internal stress fibre cables connecting FA node pairs across the cell.
 # Active contractile elements driven by global sf_contract from EndothelialCell.
@@ -8,12 +8,11 @@
 #   2. Lateral squeeze — inward force on boundary nodes near each cable
 
 # Biology:
-#        Actomyosin bundle spanning the cell along the flow axis.
-#        Generates active contractile tension when RhoC is active.
-#        No rest length — tension proportional to contractility × length.
-#        Longer cell → more myosin motors engaged → more tension.
+#   Actomyosin bundle spanning the cell along the flow axis.
+#   Generates active contractile tension when RhoC is active.
+#   No rest length — tension proportional to contractility × length.
+#   Longer cell → more myosin motors engaged → more tension.
 #
-
 import numpy as np
 
 class StressFibre:
@@ -54,7 +53,6 @@ class StressFibre:
     # ------------------------------------------------------------------
     # 1. Geometry and tension
     # ------------------------------------------------------------------
-
     def update_geometry_and_tension(self):
         """
         Recompute cable length, unit vector, y midpoint, and tension.
@@ -73,7 +71,7 @@ class StressFibre:
         self.L_current = length
         self.unit_vec  = diff / length
         self.cable_y   = 0.5 * (self.node_upstream.pos[1] + self.node_downstream.pos[1])
-        self.t_sf = self.k_sf * self.a_sf #* self.L_current
+        self.t_sf = self.k_sf * self.a_sf * self.L_current
 
 
     # ------------------------------------------------------------------
@@ -84,10 +82,6 @@ class StressFibre:
         """
         Pull upstream and downstream FA nodes toward each other.
 
-        Upstream node:   pulled in +x (toward downstream)
-        Downstream node: pulled in -x (toward upstream)
-        Net force = 0 — no translation.
-
         Combined with FA anchoring (which resists inward movement),
         this creates a stable equilibrium at the elongated length:
             - Without SF: cortex recoil wins → cell rounds up
@@ -97,8 +91,8 @@ class StressFibre:
             return
 
         force = self.t_sf * self.unit_vec
-        self.node_upstream.apply_force(force)
-        self.node_downstream.apply_force(-force)
+        self.node_upstream.apply_force(force) # pulled in +x, towards downstream
+        self.node_downstream.apply_force(-force) # pulled in -x, towards upstream
 
     # ------------------------------------------------------------------
     # 3. Squeeze force — called by EndothelialCell per boundary node
@@ -131,13 +125,36 @@ class StressFibre:
     # ------------------------------------------------------------------
     # Diagnostics
     # ------------------------------------------------------------------
+    def get_squeeze_profile(self, nodes):
+        """
+        Returns squeeze force applied to each node.
+        Used for diganostics and debugging. 
+        """
+        if self.a_sf < 1e-6:
+            return {}
+
+        max_y = max(abs(n.pos[1] - self.cable_y) for n in nodes)
+        if max_y < 1e-10:
+            return {}
+
+        profile = {}
+
+        for n in nodes:
+            f = self.get_squeeze_force(n.pos[1], max_y)
+            profile[n.id] = round(f, 4)
+
+        return profile
 
     def get_state(self):
         return {
-            'contractility': round(self.a_sf, 4),
-            'L_current': round(self.L_current, 4),
-            'T_sf': round(self.t_sf, 4),
-            'cable_y': round(self.cable_y, 4),
+            "length": float(self.L_current),
+            "unit_vec": self.unit_vec.copy(),   # direction of pull
+            "tension": float(self.t_sf),
+
+            "force_vector": (self.t_sf * self.unit_vec).copy(),
+
+            "cable_y": float(self.cable_y),
+            "contractility": float(self.a_sf),
         }
 
     def __repr__(self):

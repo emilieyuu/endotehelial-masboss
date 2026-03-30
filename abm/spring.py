@@ -21,9 +21,9 @@ class Spring:
     def __init__(self, spring_id, node_1, node_2,
                  rest_length, k_cortex, lut, cfg):
 
-        self.id     = spring_id
-        self.lut    = lut
-        self.cfg    = cfg
+        self.id = spring_id
+        self.lut = lut
+        self.cfg = cfg
         self.node_1 = node_1
         self.node_2 = node_2
 
@@ -34,9 +34,9 @@ class Spring:
         self.t_cortex = 0.0
 
         # Geometry
-        self.L_current       = rest_length
-        self.unit_vec        = np.zeros(2)
-        self.alignment       = 0.0
+        self.L_current = rest_length
+        self.unit_vec = np.zeros(2)
+        self.alignment = 0.0
         self._init_alignment = 0.0    # frozen at init by EndothelialCell
 
     # ------------------------------------------------------------------
@@ -44,8 +44,7 @@ class Spring:
     # ------------------------------------------------------------------
     def update_geometry(self, flow_direction):
         """
-        Recompute length and tension from current node positions.
-        Reads P_RhoA from endpoint nodes to set k_active.
+        Recompute length and alignment from current node positions.
         """
         diff = self.node_2.pos - self.node_1.pos
         length = np.linalg.norm(diff)
@@ -61,19 +60,26 @@ class Spring:
     # 2. Tension & Stiffness
     # ------------------------------------------------------------------
     def update_cortex(self):
-        # Stiffness from endpoint node RhoAs
+        """
+        Recompute stiffness and tension from RhoA activation at endpoints. 
+        """
+        mech_cfg = self.cfg['mechanics']
+
+        # Get RhoA from mean of endpoints nodes
         mean_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
-        delta_rhoa = max(mean_rhoa - self.lut.rhoa_rest, 0.0)
+        delta_rhoa = max(mean_rhoa - self.lut.rhoa_rest, 0.0) # get RhoA activity above rest
+
+        # Recompute stiffness from updated RhoA activation
         self.k_active = self.k_cortex * (
-            1.0 + self.cfg['mechanics']['rhoa_k_gain'] * delta_rhoa
+            1.0 + mech_cfg['rhoa_k_gain'] * delta_rhoa
         )
 
-        # Cortical tension
+        # Set updated cortical tension.
         self.t_cortex = bilinear_tension(
             l_current=self.L_current,
             l_rest=self.L_cortex,
             k_tensile=self.k_active,
-            kc_ratio=self.cfg['mechanics']['kc_ratio']
+            kc_ratio=mech_cfg['kc_ratio']
         )
 
 
@@ -82,7 +88,9 @@ class Spring:
     # ------------------------------------------------------------------
 
     def apply_forces(self):
-        """Equal and opposite cortical forces on connected nodes."""
+        """
+        Equal and opposite cortical forces on connected nodes.
+        """
         if self.L_current < 1e-10:
             return
         force_vec = self.t_cortex * self.unit_vec
@@ -93,10 +101,10 @@ class Spring:
     # ------------------------------------------------------------------
     # Diagnostics
     # ------------------------------------------------------------------
-
     def get_state(self):
-        threshold  = self.cfg['mechanics'].get('polar_threshold', 0.85)
+        threshold  = self.cfg['cell_geometry'].get('polar_threshold', 0.85)
         population = 'lateral' if self._init_alignment > threshold else 'polar'
+        
         return {
             'id':             self.id,
             'population':     population,

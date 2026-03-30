@@ -1,4 +1,4 @@
-# abm_v2/endothelial_cell.py
+# abm/endothelial_cell.py
 #
 # 2D endothelial cell — closed ring of membrane nodes connected by cortical springs,
 # with an internal stress fibre cable connecting the two pole nodes.
@@ -78,7 +78,7 @@ class EndothelialCell:
         Place n_nodes evenly on a circle, offset by π/2 so node 0
         starts at the top. Pole nodes land on the flow axis.
         """
-        init_ar = self.cfg['sim'].get('init_ar', 1.0)
+        init_ar = self.cfg['cell_geometry'].get('init_ar', 1.0)
         r_x     = radius * np.sqrt(init_ar)   # semi-axis along flow
         r_y     = radius / np.sqrt(init_ar)   # semi-axis perpendicular
 
@@ -90,6 +90,7 @@ class EndothelialCell:
                 centroid[1] + r_y * np.sin(angle),
             ])
             nodes.append(MembraneNode(i, pos, self.lut, self.cfg))
+
         return nodes
 
     def _classify_nodes(self):
@@ -261,7 +262,7 @@ class EndothelialCell:
             Stored on node, read by update_signalling() this step.
         """
         f_magnitude   = flow_field.magnitude
-        drag_fraction = self.cfg['mechanics'].get('drag_fraction', 0.1)
+        drag_fraction = self.cfg['flow'].get('drag_fraction', 0.1)
         drag          = f_magnitude * drag_fraction
 
         for i, node in enumerate(self.nodes):
@@ -415,6 +416,7 @@ class EndothelialCell:
         mean_rhoc = float(np.mean([n.P_RhoC for n in self.nodes]))
         delta_rhoc = max(mean_rhoc - self.lut.rhoc_rest, 0.0)
         rhoc_max = mech.get('rhoc_max', 0.365)
+        
         a_sf_target  = min(delta_rhoc / rhoc_max, 1.0)
 
         alpha = dt / mech['tau_remodel']
@@ -474,7 +476,7 @@ class EndothelialCell:
 
         # -- Integration --
         # 9. Integrate node positions
-        gamma    = self.cfg['sim']['gamma']
+        gamma    = self.cfg['integration']['gamma']
         max_disp = self.rest_length * 0.1
         for node in self.nodes:
             node.integrate_step(dt, gamma, max_disp)
@@ -516,6 +518,58 @@ class EndothelialCell:
                 'orientation': round(orientation, 2),
                 'area_err':    round(self.current_area / self.target_area, 4),
             }
+    
+    # ------------------------------------------------------------------
+    # Diagnostics
+    # ------------------------------------------------------------------
+    def get_fa_diagnostics(self):
+        """
+        Focal Adhesion Debugging
+        """
+        k_fa = self.cfg['mechanics'].get('k_fa', 2.0)
+
+        data = {}
+
+        for node in self.nodes:
+            if node.id not in self.fa_nodes:
+                continue
+
+            rest = self.fa_max_displacement[node.id]
+            disp = node.pos - rest
+
+            axial_disp = np.dot(disp, self.flow_direction) * self.flow_direction
+            force = -k_fa * axial_disp
+
+            data[node.id] = {
+                "pos": node.pos.copy(),
+                "anchor": rest.copy(),
+                "disp": disp.copy(),
+                "axial_disp": axial_disp.copy(),
+                "force": force.copy(),
+                "force_mag": float(np.linalg.norm(force)),
+            }
+
+        return data
+
+    def get_diagnostics(self):
+        """ FA and SF check -- debugging"""
+        return {
+            "a_sf": float(self.a_sf),
+
+            "stress_fibres": [
+                sf.get_state() for sf in self.stress_fibres
+            ],
+
+            "squeeze_profiles": [
+                sf.get_squeeze_profile(self.nodes)
+                for sf in self.stress_fibres
+            ],
+
+            "fa": self.get_fa_diagnostics(),
+
+            "centroid": self.centroid,
+            "area": float(self.current_area),
+        }
 
     def get_state(self):
         shape     = self.measure_shape()

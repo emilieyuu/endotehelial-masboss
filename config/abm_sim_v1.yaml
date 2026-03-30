@@ -1,0 +1,99 @@
+# config/abm_sim_v1.yaml
+
+# Metadata
+experiment: "abm_simulation"
+
+# Files
+files: 
+  # Lookup Table
+  recruitment_csv: "param_sweep_Joint_Recr_Sweep.csv"
+
+# Simulation: Environment / System Inputs
+sim: 
+  # Time / integration
+  dt: 0.1 # 6 seconds per step
+  n_steps: 1000
+
+  # Mechanics (intrinsic, used in overdamped dynamics)
+  gamma: 3.0 
+
+  # Cell  (initial state)
+  n_nodes: 16
+  radius: 12 # units → 36 µm, area ~3968 µm²
+  init_ar: 1.2 #cell aspect ratio at initialisation
+
+  # Flow (External Input)
+  f_magnitude: 15
+  f_direction: [1.0, 0.0]
+
+# TIME MAPPING
+# dt = 0.1           →  6 seconds
+# tau_remodel = 30   →  30 minutes
+# 300 steps          →  30 minutes  (63% remodelling)
+# 900 steps          →  90 minutes  (95% remodelling)
+# 1500 steps         →  150 minutes (sweep standard run)
+# 14400 steps        →  24 hours    (full experimental run)
+
+
+# Signalling – Hill Function Params
+hill_params: 
+  DSP: {K: 1.3, n: 3, p_max: 0.67, knocked_out: False}
+  TJP1: {K: 3.0, n: 2, p_max: 0.67, knocked_out: False}
+  JCAD: {K: 1.3, n: 4, p_max: 0.67, knocked_out: False}
+
+
+# Mechanics
+mechanics:
+  # Cortical spring 
+  k_cortex: 1.0 # Reference stiffness (normalised)
+  kc_ratio: 0.1 # Compressive stiffness = 10% of tensile
+  rhoa_k_gain: 15.0 # RhoA stiffening gain
+
+  # Stress fibre 
+  k_sf: 0.4
+  nu_sf: 0.3
+  rhoc_max: 0.365
+
+  # Remodelling
+  tau_remodel: 30.0 # Time constant – 30 minutes
+
+  # Flow and protrusion
+  f_magnitude: 15
+  
+
+  # Area Conservation
+  k_area: 0.5
+  k_fa: 2.0
+  drag_fraction: 0.1
+
+  # Geometry
+  polar_threshold: 0.85
+
+  # v1 only
+  a_sf_rest: 1.0     #no fibres assembled at t=0
+  a_sf_baseline: 0.81   # physiological SF contraction at rest (Jakob et al.)
+  a_sf_min: 0.3   # maximum contraction at full RhoC 
+  rhoc_protrusion_gain: 4.0
+
+
+  # Pertubations: 
+perturbations:
+  WT: {}
+  DSP_KO: {DSP: {knocked_out: True}}
+  TJP1_KO: {TJP1: {knocked_out: True}}
+  JCAD_KO: {JCAD: {knocked_out: True}}
+  DSP_JCAD_DKO: {DSP: {knocked_out: True}, JCAD: {knocked_out: True}}
+  TJP1_JCAD_DKO: {TJP1: {knocked_out: True}, JCAD: {knocked_out: True}}
+
+analysis:
+  phenotypes:
+    failed: "Failed"
+    normal: "Normal"
+    hyper:  "Hyper"
+  thresholds:
+    balance:   0.25   # matches MaBoSS eps=0.25
+    k_active:  1.3    # significant RhoA stiffening
+    lsf:       0.95   # fibres assembled
+    ar_hyper:  1.2    # AR ratio above WT = hyper
+    ar_failed: 0.85   # AR ratio below WT = failed
+  
