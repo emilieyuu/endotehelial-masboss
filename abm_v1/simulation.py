@@ -2,8 +2,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from abm.flow_field import FlowField
-from abm.endothelial_cell import EndothelialCell
+from abm_v1.flow_field import FlowField
+from abm_v1.endothelial_cell import EndothelialCell
 import copy
 
 def run_sim(cfg, lut, label='cell', n_steps=500, print_every=100,

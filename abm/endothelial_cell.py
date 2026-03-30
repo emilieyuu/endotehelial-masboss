@@ -1,35 +1,46 @@
-# abm/endothelial_cell.py
-# 
-# A closed ring of membrane nodes representing the cell cortex in 2D.
-# Orchestrates springs, nodes, flow, and pressure each timestep.
+# abm_v2/endothelial_cell.py
+#
+# 2D endothelial cell — closed ring of membrane nodes connected by cortical springs,
+# with an internal stress fibre cable connecting the two pole nodes.
+#
+# Mechanical systems:
+#   1. Cortical springs     — passive elastic resistance, RhoA-stiffened
+#   2. Uniform shear        — tensile at poles, tangential at flanks
+#   3. Stress fibre cable   — active contractile, RhoC-driven
+#   4. Poisson SF squeeze   — lateral narrowing from SF contraction
+#   5. FA anchoring         — shape stabilisation, RhoC-driven, tracks elongation
+#   6. Soft pressure        — area conservation
 
 import numpy as np
 from abm.membrane_node import MembraneNode
 from abm.spring import Spring
+from abm.stress_fibre import StressFibre
 
-class EndothelialCell: 
+class EndothelialCell:
     """
-    A 2D endothelial cell represented as a closed ring of n_nodes
-    membrane nodes connected by springs.
+    2D endothelial cell — closed ring of membrane nodes connected by
+    cortical springs, with internal SF cables between FA node pairs.
 
-    Mechanical inputs each timestep:
-        - Flow field: opposing forces on upstream/downstream pole nodes
-                      stretch lateral springs, driving the Rho signal chain
-        - Spring forces: cortical tension resists deformation
+    Mechanical systems:
+        1. Uniform shear (tensile component) — loads poles, drives signalling
+        2. Cortical springs — passive elastic resistance, RhoA-stiffened
+        3. SF cables — active contractile pretension, RhoC-driven
+        4. SF lateral squeeze — Poisson narrowing, RhoC-driven
+        5. FA anchoring — substrate anchors at pole nodes, passive
+        6. Soft pressure — area conservation
 
-    Emergent behaviour:
-        - RhoA stiffens lateral cortex  → resists compression → failed elongation if dominant
-        - RhoC shortens SF rest length  → narrows lateral width → elongation if dominant
-        - Shape (AR, orientation) emerges from Rho balance, not imposed externally
+    Signalling:
+        Node-level: f_normal → DSP/TJP1/JCAD → LUT → P_RhoA, P_RhoC
+        Spring-level: reads P_RhoA from endpoint nodes → k_active
+        Cell-level: mean P_RhoC across nodes → a_sf → SF cables
     """
-    def __init__(self, cell_id: int, centroid: np.ndarray, lut, cfg: dict, 
-                 n_nodes: int = 16, radius: float = 12.0, flow_direction=None):
-        
-        # Cell General Properties
-        self.id = cell_id
-        self.n_nodes = n_nodes
-        self.cfg = cfg
-        self.lut = lut
+    def __init__(self, cell_id, centroid, lut, cfg,
+                 n_nodes=16, radius=12.0, flow_direction=np.array([1.0, 0.0])):
+
+        self.id          = cell_id
+        self.n_nodes     = n_nodes
+        self.cfg         = cfg
+        self.lut         = lut
 
         # Normalised Flow Direction
         flow = np.asarray(flow_direction, dtype=float)
@@ -40,364 +51,501 @@ class EndothelialCell:
         self.k_cortex = mech_cfg['k_cortex']
         self.rest_length = 2 * radius * np.sin(np.pi / n_nodes) # distance between adjacent nodes on regular n-gon: 2R sin(π/n)
 
-        # Geometry: Initialise Node Ring and Springs
-        self.nodes = self._init_node_ring(centroid, n_nodes, radius)
+        # Build node ring and classify
+        self.nodes = self._init_node_ring(centroid, n_nodes, radius, lut, cfg)
         self._classify_nodes()
-        self.springs = self._init_springs(lut)
+
+        self.springs = self._init_springs(lut, cfg)
+        
+        # Build FA nodes and SF cables
+        # fa_nodes: dict {node_id: fa_position} — fixed substrate positions
+        # stress_fibres: list of StressFibre, one per FA pair
+        self.fa_nodes, self.fa_max_displacement, self.stress_fibres = self._init_fa_and_sf()
+
+        # Global SF activation — set each step from node P_RhoC
+        self.a_sf = 0.0
 
         # Cell Area 
         self.target_area = self._compute_area() # fixed, acts as reference
         self.current_area = self.target_area # dynamic, remodelled to maintain "incompressible cytoplasm"
 
+    
     # ------------------------------------------------------------------
     # Initialisation
     # ------------------------------------------------------------------
-    def _init_node_ring(self, centroid, n_nodes, radius):
+    def _init_node_ring(self, centroid, n_nodes, radius, lut, cfg):
         """
-        Place n_nodes evenly around a circle.
-        Angles spaced at 2π/n intervals, offset by π/2 so node 0 starts at the top
+        Place n_nodes evenly on a circle, offset by π/2 so node 0
+        starts at the top. Pole nodes land on the flow axis.
         """
-        # Compute angles between nodes. 
-        angles = np.linspace(0, 2*np.pi, n_nodes, endpoint=False) + np.pi/2 # offset
-        nodes = []
+        init_ar = self.cfg['sim'].get('init_ar', 1.0)
+        r_x     = radius * np.sqrt(init_ar)   # semi-axis along flow
+        r_y     = radius / np.sqrt(init_ar)   # semi-axis perpendicular
 
+        angles = np.linspace(0, 2*np.pi, n_nodes, endpoint=False) + np.pi/2
+        nodes  = []
         for i, angle in enumerate(angles):
             pos = np.array([
-                centroid[0] + radius * np.cos(angle),
-                centroid[1] + radius * np.sin(angle),
+                centroid[0] + r_x * np.cos(angle),
+                centroid[1] + r_y * np.sin(angle),
             ])
-            nodes.append(MembraneNode(i, pos))
-
+            nodes.append(MembraneNode(i, pos, self.lut, self.cfg))
         return nodes
 
-    
     def _classify_nodes(self):
         """
-        Label each node upstream, downstream, or lateral based on its
-        radial projection onto the flow axis.
+        Upstream/downstream: argmin/argmax projection onto flow axis.
+        Gives exactly 1 of each regardless of node count.
+        Lateral: all remaining nodes.
         """
-        #threshold =  0.9 #float(self.cfg['mechanics'].get('polar_threshold', 0.85))
-        centroid    = self.centroid
-        projections = []
+        threshold = np.cos(np.radians(30))
+        centroid  = self.centroid
 
         for node in self.nodes:
             radial = node.pos - centroid
             radial_unit = radial / np.linalg.norm(radial)
             projection = np.dot(radial_unit, self.flow_direction)
-            projections.append((projection, node))
-            #print(projection)
 
-        # Sort by projection
-        projections.sort(key=lambda x: x[0])
-
-        # Most negative projection = upstream (faces into flow)
-        # Most positive projection = downstream (faces away from flow)
-        upstream_node   = projections[0][1]
-        downstream_node = projections[-1][1]
-
-        for proj, node in projections:
-            if node is upstream_node:
-                node.role = 'upstream'
-            elif node is downstream_node:
+            if projection > threshold:
                 node.role = 'downstream'
+            elif projection < -threshold:
+                node.role = 'upstream'
             else:
                 node.role = 'lateral'
-    
-    def _init_springs(self, lut):
+
+    def _init_springs(self, lut, cfg):
         """
         Connect adjacent nodes in a ring.
-        Store _init_alignment on each spring so population splits
-        remain valid at high AR when current alignment rotates.
+        Store _init_alignment frozen at init.
         """
         springs = []
-
         for i in range(self.n_nodes):
-            # Node i connects to node (i+1) mod n_nodes — last node wraps back to node 0.
-            node1 = self.nodes[i]
-            node2 = self.nodes[(i + 1) % self.n_nodes]
+            n1 = self.nodes[i]
+            n2 = self.nodes[(i + 1) % self.n_nodes]
 
-            s = Spring(
-                spring_id=i, node_1=node1, node_2=node2, # id matches its lower-indexed node.
-                rest_length=self.rest_length, k_cortex = self.k_cortex,
-                lut=lut, cfg=self.cfg
+            s  = Spring(
+                spring_id=i, node_1=n1, node_2=n2,
+                rest_length=self.rest_length,
+                k_cortex=self.k_cortex,
+                lut=lut, cfg=cfg
             )
 
-            # Compute and store initial alignment for population classification
-            diff = node2.pos - node1.pos
+            diff = n2.pos - n1.pos
             norm = np.linalg.norm(diff)
-            s._init_alignment = (abs(np.dot(diff / norm, self.flow_direction)) 
-                                if norm > 1e-10 else 0.0)
+
+            s._init_alignment = (
+                abs(np.dot(diff / norm, self.flow_direction))
+                if norm > 1e-10 else 0.0
+            )
 
             springs.append(s)
-
         return springs
-        
+    
+    def _init_fa_and_sf(self):
+        """
+        Use only the centre pole node (closest to flow axis) per side.
+        One upstream FA, one downstream FA, one SF cable.
+
+        Off-axis pole nodes are classified as upstream/downstream for
+        signalling purposes but do NOT get FA anchoring — they are free
+        to move laterally, allowing the cell to narrow correctly.
+        """
+        # Find the single node closest to flow axis on each side
+        upstream_nodes   = [n for n in self.nodes if n.role == 'upstream']
+        downstream_nodes = [n for n in self.nodes if n.role == 'downstream']
+
+        # Centre pole = node with smallest |y| on each side
+        up_centre = min(upstream_nodes,   key=lambda n: abs(n.pos[1]))
+        dn_centre = min(downstream_nodes, key=lambda n: abs(n.pos[1]))
+
+        # FA positions fixed at init — only centre pole nodes
+        fa_nodes = {
+            up_centre.id: up_centre.pos.copy(),
+            dn_centre.id: dn_centre.pos.copy(),
+        }
+
+        fa_max_displacement = {
+            up_centre.id:  up_centre.pos.copy(),
+            dn_centre.id:  dn_centre.pos.copy(),
+        }
+
+        # Single SF cable along flow axis
+        stress_fibres = [StressFibre(up_centre, dn_centre, self.cfg)]
+
+        return fa_nodes, fa_max_displacement, stress_fibres
     # ------------------------------------------------------------------
     # Properties
     # ------------------------------------------------------------------
+
     @property
-    def positions(self) -> np.ndarray:
+    def positions(self):
         return np.array([n.pos for n in self.nodes])
-    
+
     @property
-    def centroid(self) -> np.ndarray:
+    def centroid(self):
         return self.positions.mean(axis=0)
-    
+
     # ------------------------------------------------------------------
     # Geometry
     # ------------------------------------------------------------------
     def _compute_area(self):
-        """
-        Shoelace formula for the signed area of a polygon.
-        A = ½ |Σ (xᵢ yᵢ₊₁ − xᵢ₊₁ yᵢ)|
-
-        Works for any simple polygon — no assumption of convexity.
-        """
-        pos = self.positions
+        """Shoelace formula — polygon area from node positions."""
+        pos  = self.positions
         x, y = pos[:, 0], pos[:, 1]
-
         return 0.5 * abs(
             np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1))
         )
+
+    def _compute_node_normal(self, node_idx):
+        """
+        Outward unit normal at node i.
+
+        Computed from adjacent edge vectors:
+            e1 = curr - prev  (incoming edge)
+            e2 = next - curr  (outgoing edge)
+
+        For CCW winding, outward normal of edge (a→b) is (-dy, dx).
+        Average the normals of both adjacent edges for a smooth result.
+
+        Used for:
+            1. Computing f_normal at each node (tensile shear component)
+            2. Applying pressure forces along outward normal
+        """
+        n  = self.n_nodes
+        prev = self.nodes[(node_idx - 1) % n].pos
+        curr = self.nodes[node_idx].pos
+        nxt  = self.nodes[(node_idx + 1) % n].pos
+
+        e1 = curr - prev
+        e2 = nxt - curr
+
+        # Outward normals — rotate each edge 90° CCW
+        n1 = np.array([-e1[1],  e1[0]])
+        n2 = np.array([-e2[1],  e2[0]])
+
+        normal = n1 + n2
+        norm = np.linalg.norm(normal)
+        return normal / norm if norm > 1e-10 else np.zeros(2)
+
+    def _spring_populations(self):
+        """
+        Polar springs: connected to a pole node.
+        Lateral springs: both nodes are lateral.
+        """
+        pole_nodes = {n for n in self.nodes
+                      if n.role in ('upstream', 'downstream')}
+        polar   = [s for s in self.springs
+                   if s.node_1 in pole_nodes or s.node_2 in pole_nodes]
+        lateral = [s for s in self.springs if s not in polar]
+        return lateral, polar
     
+    # ------------------------------------------------------------------
+    # Force methods
+    # ------------------------------------------------------------------
+
+    def _apply_shear(self, flow_field):
+        """
+        Apply shear force to all nodes and set f_normal for signalling.
+
+        Two effects from the same uniform shear force:
+
+        Mechanical effect:
+            Full force vector applied to every node.
+            Mean subtracted to remove rigid body translation —
+            cell is substrate-anchored, net force absorbed by substrate.
+
+        Signalling effect:
+            f_normal = |F · n̂| at each node — tensile shear component.
+            Highest at poles (normal ∥ flow → full projection).
+            Zero at flanks (normal ⊥ flow → zero projection).
+            Stored on node, read by update_signalling() this step.
+        """
+        f_magnitude   = flow_field.magnitude
+        drag_fraction = self.cfg['mechanics'].get('drag_fraction', 0.1)
+        drag          = f_magnitude * drag_fraction
+
+        for i, node in enumerate(self.nodes):
+            normal = self._compute_node_normal(i)
+
+            # Signalling
+            node.f_normal = f_magnitude * abs(
+                np.dot(self.flow_direction, normal)
+            )
+            node.f_total = f_magnitude
+
+            # Mechanical drag — opposing forces at poles only
+            if node.role == 'downstream':
+                node.apply_force( self.flow_direction * drag)
+            elif node.role == 'upstream':
+                node.apply_force(-self.flow_direction * drag)
+
+    def _apply_fa_anchoring(self):
+        """
+        FA substrate anchor forces on pole nodes.
+
+        Each FA is a fixed point on the substrate set at initialisation.
+        As the cell deforms, pole nodes drift from their FA positions.
+        The FA pulls the node back: F = -k_fa × (node.pos - fa.pos)
+
+        When node sits exactly on FA: force = 0
+        When node drifts away: force pulls it back proportionally
+
+        This is purely passive — no RhoC scaling.
+        The RhoC effect on shape comes from SF cables and squeeze,
+        not from FA grip strength.
+
+        Combined with SF cable tension (which pulls poles inward),
+        the FA anchoring resists that inward pull — the balance
+        determines the steady-state elongated position.
+        """
+        k_fa = self.cfg['mechanics'].get('k_fa', 2.0)
+
+        for node in self.nodes:
+            if node.id not in self.fa_nodes:
+                continue
+
+            # Current axial displacement from centroid
+            axial_pos = np.dot(node.pos, self.flow_direction)
+            fa_axial  = np.dot(
+                self.fa_max_displacement[node.id], self.flow_direction
+            )
+
+            # Ratchet — only update FA position if pole moved further out
+            if abs(axial_pos) > abs(fa_axial):
+                self.fa_max_displacement[node.id] = node.pos.copy()
+
+            # FA force — resist displacement from maximum reached position
+            rest = self.fa_max_displacement[node.id]
+            disp = node.pos - rest
+
+            # Axial component only — FAs resist axial contraction
+            axial_disp = np.dot(disp, self.flow_direction) * self.flow_direction
+            node.apply_force(-k_fa * axial_disp)
+
+    def _apply_sf_squeeze(self):
+        """
+        Lateral squeeze from SF contraction — computed by Cell.
+
+        For each SF cable, for each boundary node:
+            d = node.pos[1] - cable.cable_y
+            weight = |d| / max_y_distance  (0 at poles, 1 at max flank)
+            F = sf.get_squeeze_force(node.pos[1], max_y_distance)
+
+        max_y_distance computed per cable across all nodes —
+        normalises the weight so the most distant node always gets
+        weight=1, regardless of cell shape.
+
+        Applied as y-only force — squeeze is purely lateral.
+        """
+        for sf in self.stress_fibres:
+            if sf.a_sf < 1e-6:
+                continue
+
+            # Max y-distance from this cable across all nodes
+            max_y = max(
+                abs(n.pos[1] - sf.cable_y) for n in self.nodes
+            )
+            if max_y < 1e-10:
+                continue
+
+            for node in self.nodes:
+                f_squeeze = sf.get_squeeze_force(node.pos[1], max_y)
+                if abs(f_squeeze) > 1e-10:
+                    node.apply_force(np.array([0.0, f_squeeze]))
+
     def _apply_pressure(self):
         """
-        Soft area conservation — prevents cell collapse under SF shortening.
-        Does not drive elongation — that comes from pole forces and Rho remodelling.
-        k_area should be small relative to k_cortex.
+        Soft area conservation — only fires on area deficit.
+
+        Pressure = k_area × (target_area - current_area)
+        Applied outward along local normal at each node,
+        weighted by arc length dL at that node.
+
+        dL = 0.5 × (distance to prev + distance to next neighbour)
+        This gives nodes covering more boundary more pressure force —
+        biologically accurate: pressure acts on membrane area.
+
+        Only fires when area_deficit > 0 — never inflates beyond target.
+        This prevents pressure from amplifying spurious elongation.
         """
-        pressure = self.cfg['mechanics'].get('k_area', 0.1) * \
-                (self.target_area - self.current_area)
-        centroid = self.centroid
-        for node in self.nodes:
-            outward = node.pos - centroid
-            norm    = np.linalg.norm(outward)
-            if norm < 1e-10:
-                continue
-            node.apply_force((outward / norm) * pressure)
-
-    def _apply_sf_protrusion(self): 
-        """
-        Stres Fibre driven protrusion  membrane protrusion at upstream/downstream poles. 
-
-        Stress fibres extend along flow axis to polar poles, where
-        continued actin assemply protrudes the membrane outward. 
-
-        Reads mean RhoC activity aboce rest from neighbouring
-        spring at poles, and applies a proportional outward force at each pole node. 
-
-        Force direction: outwards from centroid. 
-        """
-        gain = self.cfg['mechanics'].get('rhoc_protrusion_gain', 2.0)
-
-        lateral, _ = self._spring_populations()
-
-        # Read RhoC from lateral springs — these have the highest RhoC signal
-        # Biology: SF contractile signal propagates from lateral junctions
-        # to polar focal adhesions where actin polymerisation occurs
-        if not lateral:
+        area_deficit = self.target_area - self.current_area
+        if area_deficit <= 0:
             return
 
-        delta_rhoc = float(np.mean([
-            max(s.P_RhoC - self.lut.rhoc_rest, 0.0)
-            for s in lateral
-        ]))
-        if delta_rhoc < 1e-6:
-            return
+        pressure = self.cfg['mechanics']['k_area'] * area_deficit
+        n        = self.n_nodes
 
-        for node in self.nodes:
-            if node.role not in ('upstream', 'downstream'):
-                continue
-            outward      = node.pos - self.centroid
-            outward_unit = outward / np.linalg.norm(outward)
-            node.apply_force(outward_unit * gain * delta_rhoc)
+        for i, node in enumerate(self.nodes):
+            # Arc length assigned to this node
+            prev = self.nodes[(i - 1) % n].pos
+            nxt  = self.nodes[(i + 1) % n].pos
+            dL   = 0.5 * (
+                np.linalg.norm(node.pos - prev) +
+                np.linalg.norm(nxt  - node.pos)
+            )
 
-        # for node in self.nodes:
-        #     if node.role not in ('upstream', 'downstream'):
-        #         continue
+            normal = self._compute_node_normal(i)
+            node.apply_force(pressure * dL * normal)
 
-        #     neighbours = [s for s in self.springs
-        #                   if s.node_1 is node or s.node_2 is node]
-            
-        #     # Read RhoC signal from springs neighbouring this pole node
-        #     delta_rhoc = float(np.mean([
-        #         max(s.P_RhoC - self.lut.rhoc_rest, 0.0)
-        #         for s in neighbours
-        #     ]))
+    # ------------------------------------------------------------------
+    # Signalling and remodelling
+    # ------------------------------------------------------------------
+    def _update_a_sf(self, dt):
+        """
+        Update global SF activation (a_sf) from mean node P_RhoC.
 
-        #     outward = node.pos - self.centroid
-        #     outward_unit = outward / np.linalg.norm(outward)
+        Biology:
+            RhoC is a global whole-cell signal — SF contractility is
+            uniform across all cables, not spatially varying.
+            Mean P_RhoC across ALL nodes (not just lateral) gives the
+            whole-cell RhoC activity level.
 
-        #     node.apply_force(outward_unit * gain * delta_rhoc)
+        a_sf target:
+            delta_rhoC = mean(P_RhoC) - rhoc_rest
+            a_sf_target = delta_rhoC / rhoc_max  (normalised 0-1)
+
+        First-order lag toward target with tau_remodel:
+            Models the finite timescale of SF assembly/disassembly.
+            Fast assembly when RhoC rises, slow disassembly when it falls.
+
+        Sets a_sf on all SF cables.
+        """
+        mech = self.cfg['mechanics']
+
+        mean_rhoc = float(np.mean([n.P_RhoC for n in self.nodes]))
+        delta_rhoc = max(mean_rhoc - self.lut.rhoc_rest, 0.0)
+        rhoc_max = mech.get('rhoc_max', 0.365)
+        a_sf_target  = min(delta_rhoc / rhoc_max, 1.0)
+
+        alpha = dt / mech['tau_remodel']
+        self.a_sf += alpha * (a_sf_target - self.a_sf)
+        self.a_sf = float(np.clip(self.a_sf, 0.0, 1.0))
+
+        # Propagate to all SF cables
+        for sf in self.stress_fibres:
+            sf.a_sf = self.a_sf
 
     # ------------------------------------------------------------------
     # Timestep
     # ------------------------------------------------------------------
+
     def step(self, flow_field, dt):
         """
-        Advance the cell by one mechanical time step. 
+        Advance one mechanical timestep.
 
-        1. External forces applied to nodes (flow field)
-        2. Spring geometry updated from current node positions
-        3. Spring forces applied to nodes
-        4. Node positions integrated
-        5. Signalling updated (reads tension from step 2)
-        6. Remodelling updated (reads Rho from step 5)
+        Order:
+            Force accumulation (1-6) → integration (7) →
+            signalling (8-9) → SF update (10) → area sync (11)
+
+        Forces must all be accumulated before integration.
+        Signalling reads geometry AFTER integration (current deformed state).
+        SF cables updated last — a_sf drives next step's cable forces.
         """
-        # Step 1: Flow-driven pole forces — stretch lateral springs
-        for node in self.nodes:
-            shear_force = flow_field.get_force_on_node(node)
-            node.apply_force(shear_force)
+        # -- Force accumulation --
 
-        self._apply_pressure()
-        self._apply_sf_protrusion()
+        # 1. Uniform shear on all nodes
+        self._apply_shear(flow_field)
 
-        # Step 2: Spring geometry — recompute length, alignment, tension
+        # 2. Cortical spring geometry 
         for spring in self.springs:
-            spring.update_geometry(flow_field.direction)
-        
-        # Step 3: Spring forces — transmit tension to nodes
+            spring.update_geometry(self.flow_direction)
+
+        # 3. Cortical spring forces
         for spring in self.springs:
             spring.apply_forces()
 
-        # Step 4: Integrate — overdamped dynamics dx = (F/gamma) dt
-        gamma = self.cfg['sim']['gamma']
+        # 4. SF geometry and tension
+        for sf in self.stress_fibres:
+            sf.update_geometry_and_tension()
+
+        # 5. SF cable forces (axial pretension on FA nodes)
+        for sf in self.stress_fibres:
+            sf.apply_forces()
+
+        # 6. SF lateral squeeze
+        self._apply_sf_squeeze()
+
+        # 7. FA anchoring (passive substrate anchors)
+        self._apply_fa_anchoring()
+
+        # 8. Soft pressure (area conservation)
+        self.current_area = self._compute_area()
+        self._apply_pressure()
+
+        # -- Integration --
+        # 9. Integrate node positions
+        gamma    = self.cfg['sim']['gamma']
         max_disp = self.rest_length * 0.1
         for node in self.nodes:
-            node.update(dt, gamma, max_disp)
+            node.integrate_step(dt, gamma, max_disp)
+        
+        # -- Signalling and remodelling --
 
-        # Step 5: Signalling — tension → proteins → Rho
-        for spring in self.springs:
-            spring.update_signalling()
+        # 10. Node signalling — f_normal already set in step 1
+        for node in self.nodes:
+            node.update_signalling()
 
-        # Step 6: Remodelling — Rho → k_active and L_sf
-        for spring in self.springs:
-            spring.update_remodelling(dt)
+        # 11. Spring stiffness from updated node P_RhoA
+        for s in self.springs:
+            s.update_cortex()
 
-        # Sync Area
+        # 12. Global a_sf from updated node P_RhoC
+        self._update_a_sf(dt)
+
+        # 13. Sync area
         self.current_area = self._compute_area()
 
     # ------------------------------------------------------------------
-    # Diagnostics & Debuggings
+    # Measurement
     # ------------------------------------------------------------------
+    def measure_shape(self):
+            """PCA-based shape descriptors."""
+            pos      = self.positions
+            centered = pos - pos.mean(axis=0)
 
-    def _spring_populations(self):
-        """
-        Split springs into lateral (parallel to flow) and polar
-        (perpendicular to flow) using initial alignment.
-        Uses same threshold as _classify_nodes for consistency.
-        """
-        # threshold = float(self.cfg['mechanics'].get('polar_threshold', 0.9))
-        # lateral   = [s for s in self.springs if s._init_alignment >  threshold]
-        # polar     = [s for s in self.springs if s._init_alignment <= threshold]
-        # return lateral, polar
-        """
-        Split springs into lateral and polar based on node roles.
-        Polar springs connect to the upstream or downstream pole node.
-        Lateral springs connect only to lateral nodes.
-        """
-        pole_nodes = {n for n in self.nodes if n.role in ('upstream', 'downstream')}
-        
-        polar   = [s for s in self.springs
-                if s.node_1 in pole_nodes or s.node_2 in pole_nodes]
-        lateral = [s for s in self.springs
-                if s.node_1 not in pole_nodes and s.node_2 not in pole_nodes]
-        
-        return lateral, polar
-    
-    def measure_shape(self) -> dict:
-        """
-        PCA-based shape descriptors.
-        Returns aspect ratio, orientation, and circularity.
-        """
-        pos      = self.positions
-        centered = pos - pos.mean(axis=0)
+            eigvals, eigvecs = np.linalg.eigh(np.cov(centered.T))
+            eigvals  = np.maximum(eigvals, 0.0)
+            major_vec = eigvecs[:, 1]
+            major     = 2.0 * np.sqrt(eigvals[1])
+            minor     = 2.0 * np.sqrt(eigvals[0])
+            ar        = major / (minor + 1e-10)
+            orientation = np.degrees(np.arctan2(major_vec[1], major_vec[0]))
 
-        eigvals, eigvecs = np.linalg.eigh(np.cov(centered.T))
-        eigvals  = np.maximum(eigvals, 0.0)
+            return {
+                'ar':          round(ar, 3),
+                'orientation': round(orientation, 2),
+                'area_err':    round(self.current_area / self.target_area, 4),
+            }
 
-        major_vec   = eigvecs[:, 1]
-        major       = 2.0 * np.sqrt(eigvals[1])
-        minor       = 2.0 * np.sqrt(eigvals[0])
-        ar          = major / (minor + 1e-10)
-        orientation = np.degrees(np.arctan2(major_vec[1], major_vec[0]))
-
-        perim = np.sum(np.linalg.norm(
-            np.diff(np.vstack([pos, pos[0]]), axis=0), axis=1
-        ))
+    def get_state(self):
+        shape     = self.measure_shape()
+        mean_rhoa = float(np.mean([n.P_RhoA for n in self.nodes]))
+        mean_rhoc = float(np.mean([n.P_RhoC for n in self.nodes]))
+        pole_fn   = float(np.mean([n.f_normal for n in self.nodes
+                                   if n.role in ('upstream','downstream')]))
+        lat_fn    = float(np.mean([n.f_normal for n in self.nodes
+                                   if n.role == 'lateral']))
+        sf_tension = float(np.mean([sf.t_sf for sf in self.stress_fibres]))
 
         return {
-            'ar':          round(ar, 3),
-            'orientation': round(orientation, 2),
-            'circularity': round(4.0 * np.pi * self.current_area /
-                                 (perim ** 2 + 1e-10), 3),
-        }
-
-    def get_state(self) -> dict:
-        """
-        State snapshot for monitoring and phenotype classification.
-
-        metrics:     shape readouts (ar, orientation, area_err)
-        signalling:  Rho balance and spatial distribution
-        mechanics:   tension by subsystem
-        remodelling: k_active and L_sf state
-        """
-        shape            = self.measure_shape()
-        lateral, polar   = self._spring_populations()
-
-        # Signalling — spatial Rho distribution
-        rho_balance  = float(np.mean([s.P_RhoC - s.P_RhoA for s in self.springs]))
-        lateral_rhoc = float(np.mean([s.P_RhoC for s in lateral])) if lateral else 0.0
-        polar_rhoa   = float(np.mean([s.P_RhoA for s in polar]))   if polar   else 0.0
-
-        # Mechanics — tension by subsystem
-        mean_t_cortex = float(np.mean([s.tension_cortex for s in self.springs]))
-        mean_t_sf     = float(np.mean([s.tension_sf     for s in self.springs]))
-
-        # Remodelling — mean state across all springs
-        mean_k_active  = float(np.mean([s.k_active for s in self.springs]))
-        mean_lsf_ratio = (float(np.mean([s.L_sf / s.L_cortex for s in lateral]))
-                          if lateral else 1.0)
-
-        return {
-            'cell_id': self.id,
-            'ar':          shape['ar'],
-            'orientation': shape['orientation'],
-            'area_err':    round(self.current_area / self.target_area, 4),
-            'rho_balance':  round(rho_balance,  3),
-            'mean_t_cortex': round(mean_t_cortex, 4),
-            'mean_t_sf':     round(mean_t_sf,     4),
-            'mean_k_active':  round(mean_k_active,  4),
-            'mean_lsf_ratio': round(mean_lsf_ratio, 4),
-            # 'metrics': {
-            #     'ar':          shape['ar'],
-            #     'orientation': shape['orientation'],
-            #     'circularity': shape['circularity'],
-            #     'area_err':    round(self.current_area / self.target_area, 4),
-            # },
-            # 'signalling': {
-            #     'rho_balance':  round(rho_balance,  3),
-            #     'lateral_rhoc': round(lateral_rhoc, 3),
-            #     'polar_rhoa':   round(polar_rhoa,   3),
-            # },
-            # 'mechanics': {
-            #     'mean_t_cortex': round(mean_t_cortex, 4),
-            #     'mean_t_sf':     round(mean_t_sf,     4),
-            # },
-            # 'remodelling': {
-            #     'mean_k_active':  round(mean_k_active,  4),
-            #     'mean_lsf_ratio': round(mean_lsf_ratio, 4),
-            # },
+            'cell_id':    self.id,
+            'ar':         shape['ar'],
+            'orientation':shape['orientation'],
+            'area_err':   shape['area_err'],
+            'mean_rhoa':  round(mean_rhoa,  3),
+            'mean_rhoc':  round(mean_rhoc,  3),
+            'a_sf':       round(self.a_sf,  4),
+            'sf_tension': round(sf_tension, 4),
+            'pole_fn':    round(pole_fn,    3),
+            'lat_fn':     round(lat_fn,     3),
         }
 
     def __repr__(self):
         s = self.get_state()
         return (
             f"EndothelialCell(id={self.id} | "
-            f"n={self.n_nodes} | "
-            f"centroid={self.centroid.round(2)} | "
             f"ar={s['ar']:.2f} | "
             f"area_err={s['area_err']:.3f} | "
-            f"rho_bal={s['rho_balance']:+.3f} | "
-            f"lsf={s['mean_lsf_ratio']:.3f} | "
-            f"t_sf={s['mean_t_sf']:.4f})")
+            f"a_sf={s['a_sf']:.3f} | "
+            f"RhoA={s['mean_rhoa']:.3f} RhoC={s['mean_rhoc']:.3f})"
+        )
