@@ -2,6 +2,7 @@
 
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import copy 
 from datetime import datetime
 
@@ -41,11 +42,40 @@ def get_spring_states(cell, exp_dict) -> list:
         rows.append({**exp_dict, **state})
     return pd.DataFrame(rows)
 
+def plot_cell(cell, title=''):
+    """
+    Minimal cell plot — nodes and springs on axes only.
+    Call standalone or via run_sim(plot=True).
+    """
+    fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+
+    # Springs
+    for s in cell.springs:
+        p1, p2 = s.node_1.pos, s.node_2.pos
+        ax.plot([p1[0], p2[0]], [p1[1], p2[1]],
+                'b-', linewidth=1.2, alpha=0.6)
+
+    # Nodes coloured by role
+    colors = {'upstream': 'red', 'downstream': 'orange', 'lateral': 'steelblue'}
+    for n in cell.nodes:
+        ax.scatter(*n.pos, c=colors[n.role], s=50, zorder=4)
+        ax.text(n.pos[0] + 0.02, n.pos[1] + 0.02,
+                str(n.id), fontsize=8, color='black', zorder=6)
+
+    ax.scatter(*cell.centroid, marker='x', c='gray', s=60, zorder=5)
+    ax.set_aspect('equal')
+    ax.axhline(0, color='gray', linewidth=0.4, linestyle='--')
+    ax.axvline(0, color='gray', linewidth=0.4, linestyle='--')
+    ax.set_title(title or 'cell shape')
+    ax.grid(True, alpha=0.15)
+    plt.tight_layout()
+    plt.show()
+
 # --------------------------------------------------
 # Single Perturbation Sim
 # --------------------------------------------------
 
-def run_abm_sim_single(cfg, lut, perturbation, n_steps):
+def run_abm_sim_single(cfg, lut, perturbation, n_steps, plot=False):
     dt = cfg['sim'].get('dt', 0.1)
     n_nodes = cfg['sim'].get('n_nodes', 16)
     radius = cfg['sim'].get('radius', 12)
@@ -58,7 +88,8 @@ def run_abm_sim_single(cfg, lut, perturbation, n_steps):
         n_nodes=n_nodes, radius=radius,
         flow_direction=flow.direction
     )
-
+    if plot:
+        plot_cell(cell)
     cell_rows = []
     spring_dfs = []
 
