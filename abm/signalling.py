@@ -11,7 +11,10 @@ def get_protein_recruitment(cfg, tau, protein, perturbation='WT'):
     if params.get('knocked_out', False):
         return 0.0 # No recruitment if protein is knocked out regardless of tau.
 
-    p_raw = hill(tau, params['K'], params['n'])
+    f_mag = cfg['flow']['f_magnitude']
+    K = f_mag / params['K_divisor']
+
+    p_raw = hill(tau, K, params['n'])
 
     # Scale to physiological range from MaBoSS
     p_max = params.get('p_max', 1.0) 

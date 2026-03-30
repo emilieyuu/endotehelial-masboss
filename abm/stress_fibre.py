@@ -40,7 +40,7 @@ class StressFibre:
 
         # Stress fibre properties
         mech = cfg['mechanics']
-        self.k_sf = mech.get('k_sf_fraction', 0.5) # cable stiffness, portion of cortex
+        self.k_sf = mech.get('k_sf', 0.5) # cable stiffness, portion of cortex
         self.nu_sf = mech.get('nu_sf', 0.3) # Poisson ratio
         self.a_sf = 0.0  # set each step by EndothelialCell
         self.t_sf = 0.0 # axial cable tension
@@ -71,7 +71,7 @@ class StressFibre:
         self.L_current = length
         self.unit_vec  = diff / length
         self.cable_y   = 0.5 * (self.node_upstream.pos[1] + self.node_downstream.pos[1])
-        self.t_sf = self.k_sf * self.a_sf * self.L_current
+        self.t_sf = self.k_sf * self.a_sf #* self.L_current
 
 
     # ------------------------------------------------------------------

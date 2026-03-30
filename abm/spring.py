@@ -63,15 +63,16 @@ class Spring:
         """
         Recompute stiffness and tension from RhoA activation at endpoints. 
         """
-        mech_cfg = self.cfg['mechanics']
+        mech = self.cfg['mechanics']
 
         # Get RhoA from mean of endpoints nodes
         mean_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
         delta_rhoa = max(mean_rhoa - self.lut.rhoa_rest, 0.0) # get RhoA activity above rest
+        rhoa_max = mech['delta_rhoa_max']
 
         # Recompute stiffness from updated RhoA activation
         self.k_active = self.k_cortex * (
-            1.0 + mech_cfg['rhoa_k_gain'] * delta_rhoa
+            1.0 + mech['rhoa_k_gain'] * delta_rhoa
         )
 
         # Set updated cortical tension.
@@ -79,7 +80,7 @@ class Spring:
             l_current=self.L_current,
             l_rest=self.L_cortex,
             k_tensile=self.k_active,
-            kc_ratio=mech_cfg['kc_ratio']
+            kc_ratio=mech['kc_ratio']
         )
 
 
@@ -104,7 +105,7 @@ class Spring:
     def get_state(self):
         threshold  = self.cfg['cell_geometry'].get('polar_threshold', 0.85)
         population = 'lateral' if self._init_alignment > threshold else 'polar'
-        
+
         return {
             'id':             self.id,
             'population':     population,

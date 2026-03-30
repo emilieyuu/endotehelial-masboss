@@ -140,18 +140,21 @@ flow:
 hill_params:
   DSP:
     K: 3.0              # f_magnitude / 5 = 15/5 = 3.0
+    K_divisor: 5
     n: 3                # moderate cooperativity — tensile junction sensor
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false   # set true for DSP_KO perturbation
 
   TJP1:
     K: 3.0              # same rule: f_magnitude / 5
+    K_divisor: 5
     n: 2                # low cooperativity — total shear sensor
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false
 
   JCAD:
     K: 3.0              # same rule: f_magnitude / 5
+    K_divisor: 5
     n: 4                # high cooperativity — sharp pole amplifier
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false
@@ -183,6 +186,11 @@ mechanics:
     # Key regulator of TJP1_KO phenotype (high RhoA → stiff → low AR).
     # SWEPT in parameter sweep.
 
+  # Maximum reachable delta RhoA for k_cortex normalisation
+  delta_rhoa_max: 0.302
+      # From LUT: max P_RhoA ≈ 0.765, rest = 0.463, delta_max ≈ 0.302
+
+
   # --- Stress fibre ---
   k_sf: 0.4
     # SF cable stiffness (pN). Tension: t_sf = k_sf × a_sf.
@@ -198,12 +206,9 @@ mechanics:
     # Biologically: SF contraction narrows cell perpendicular to fibre.
     # SWEPT in parameter sweep.
 
-  rhoc_max: 0.365
-    # Maximum delta_RhoC for a_sf normalisation.
-    # a_sf_target = delta_RhoC / rhoc_max, clipped to [0, 1].
-    # Derived from LUT: max P_RhoC ≈ 0.80, rest = 0.437,
-    #   delta_max ≈ 0.80 - 0.437 ≈ 0.365.
-    # NOT SWEPT — fixed by LUT range.
+  # Maximum reachable delta RhoC for a_sf normalisation
+  delta_rhoc_max: 0.340 
+    # From LUT: max P_RhoC ≈ 0.777, rest = 0.437, delta_max ≈ 0.340.
 
   # --- SF remodelling ---
   tau_remodel: 30.0
@@ -214,7 +219,7 @@ mechanics:
     # NOT SWEPT — biologically constrained.
 
   # --- Focal adhesion ---
-  k_fa: 2.0
+  k_fa: 4.0
     # FA spring stiffness (pN/µm). Resists displacement from ratchet.
     # Must be > k_sf so FAs resist SF contraction (otherwise poles
     # collapse inward). At k_fa=2, k_sf=0.4: FA force dominates.
@@ -236,7 +241,7 @@ mechanics:
     # NOT SWEPT — qualitative threshold, not sensitive.
 
   # --- Area conservation ---
-  k_area: 0.5
+  k_area: 0.8
     # Area conservation penalty stiffness (pN/µm²).
     # Pressure = k_area × (target_area - current_area).
     # Soft constraint — must be weak enough that SF/cortex drive shape,

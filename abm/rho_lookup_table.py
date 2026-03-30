@@ -13,6 +13,7 @@ class RhoLookupTable:
         # Load data
         path = recruitment_dir / cfg['files']['recruitment_csv']
         df = pd.read_csv(path).dropna(axis=1).round(3)
+
         print(f">>> DEBUG: Successfully loaded recruitment parameter sweep data.")
         
         # Interpolators
@@ -24,12 +25,27 @@ class RhoLookupTable:
         print(f"LUT ready | rest: RhoA={self.rhoa_rest:.3f} RhoC={self.rhoc_rest:.3f}")
 
     def _build(self, df):
-        # CHANGE: Extract steady state protein probabilities rather than 
-        # activation rate (recruitment)
-        points = df[['DSP','TJP1','JCAD']].values
+        df_filtered = df[['RhoA', 'RhoC',
+                          'p1_name','p1_value', # DSP
+                          'p2_name','p2_value', # TJP1
+                          'p3_name','p3_value']] # JCAD
+        
+        long_df = pd.DataFrame({
+            'RhoA': pd.concat([df_filtered['RhoA']]*3, ignore_index=True),
+            'RhoC': pd.concat([df_filtered['RhoC']]*3, ignore_index=True),
+            'name': pd.concat([df_filtered['p1_name'], df_filtered['p2_name'], df_filtered['p3_name']], ignore_index=True),
+            'value': pd.concat([df_filtered['p1_value'], df_filtered['p2_value'], df_filtered['p3_value']], ignore_index=True),
+        })
 
-        rhoA_interp = NearestNDInterpolator(points, df['RhoA'].values)
-        rhoC_interp = NearestNDInterpolator(points, df['RhoC'].values)
+        recr_df = long_df.pivot_table(index=['RhoA','RhoC'],
+                            columns='name',
+                            values='value',
+                            aggfunc='first').reset_index()
+
+        points = recr_df[['$DSP_recruitment','$TJP1_recruitment','$JCAD_recruitment']].values
+
+        rhoA_interp = NearestNDInterpolator(points, recr_df['RhoA'].values)
+        rhoC_interp = NearestNDInterpolator(points, recr_df['RhoC'].values)
 
         print(f">>> DEBUG: Successfully built interpolators")
 

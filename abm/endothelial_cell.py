@@ -189,6 +189,12 @@ class EndothelialCell:
     # ------------------------------------------------------------------
     # Geometry
     # ------------------------------------------------------------------
+    def _get_neighbours(self, node_idx):
+        """
+        Return (previous (idx), next (idx)) for a node in the ring.
+        """
+        return (node_idx - 1) % self.n_nodes, (node_idx + 1) % self.n_nodes
+
     def _compute_area(self):
         """Shoelace formula — polygon area from node positions."""
         pos  = self.positions
@@ -323,6 +329,38 @@ class EndothelialCell:
             axial_disp = np.dot(disp, self.flow_direction) * self.flow_direction
             node.apply_force(-k_fa * axial_disp)
 
+    def apply_sf_axial_forces(self):
+        """
+        Apply SF axial tension, distributed across FA node + neighbours.
+
+        Distribution:
+            centre node: 50%
+            neighbours:  25% each
+        """
+        for sf in self.stress_fibres:
+
+            if sf.t_sf < 1e-10:
+                continue
+
+            # Base force vector
+            force = sf.t_sf * sf.unit_vec
+
+            # Upstream side
+            up_idx = sf.node_upstream.id
+            up_prev, up_next = self._get_neighbours(up_idx)
+
+            self.nodes[up_idx].apply_force(0.5 * force)
+            self.nodes[up_prev].apply_force(0.25 * force)
+            self.nodes[up_next].apply_force(0.25 * force)
+
+            # Downstream side
+            dn_idx = sf.node_downstream.id
+            dn_prev, dn_next = self._get_neighbours(dn_idx)
+
+            self.nodes[dn_idx].apply_force(-0.5 * force)
+            self.nodes[dn_prev].apply_force(-0.25 * force)
+            self.nodes[dn_next].apply_force(-0.25 * force)
+
     def _apply_sf_squeeze(self):
         """
         Lateral squeeze from SF contraction — computed by Cell.
@@ -415,8 +453,8 @@ class EndothelialCell:
 
         mean_rhoc = float(np.mean([n.P_RhoC for n in self.nodes]))
         delta_rhoc = max(mean_rhoc - self.lut.rhoc_rest, 0.0)
-        rhoc_max = mech.get('rhoc_max', 0.365)
-        
+        rhoc_max = mech['delta_rhoc_max']
+
         a_sf_target  = min(delta_rhoc / rhoc_max, 1.0)
 
         alpha = dt / mech['tau_remodel']
@@ -461,8 +499,10 @@ class EndothelialCell:
             sf.update_geometry_and_tension()
 
         # 5. SF cable forces (axial pretension on FA nodes)
-        for sf in self.stress_fibres:
-            sf.apply_forces()
+        # for sf in self.stress_fibres:
+        #     sf.apply_forces()
+
+        self.apply_sf_axial_forces()
 
         # 6. SF lateral squeeze
         self._apply_sf_squeeze()
@@ -476,8 +516,8 @@ class EndothelialCell:
 
         # -- Integration --
         # 9. Integrate node positions
-        gamma    = self.cfg['integration']['gamma']
-        max_disp = self.rest_length * 0.1
+        gamma = self.cfg['integration']['gamma']
+        max_disp = self.cfg['integration']['max_displacement']
         for node in self.nodes:
             node.integrate_step(dt, gamma, max_disp)
         
