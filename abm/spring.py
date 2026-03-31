@@ -1,8 +1,6 @@
-# abm_v2/spring.py
-
+# abm/spring.py
 import numpy as np
 from abm.mechanics import bilinear_tension
-
 
 class Spring:
     """
@@ -37,15 +35,18 @@ class Spring:
         self.L_current = rest_length
         self.unit_vec = np.zeros(2)
         self.alignment = 0.0
-        self._init_alignment = 0.0    # frozen at init by EndothelialCell
+       # self._init_alignment = 0.0    # frozen at init by EndothelialCell
+        self.side = 'flank'
 
     # ------------------------------------------------------------------
-    # 1. Geometry 
+    # Update: Geometry, Stiffness, Tension
     # ------------------------------------------------------------------
-    def update_geometry(self, flow_direction):
+    def update(self, flow_direction):
         """
         Recompute length and alignment from current node positions.
         """
+        mech = self.cfg['mechanics']
+
         diff = self.node_2.pos - self.node_1.pos
         length = np.linalg.norm(diff)
 
@@ -56,19 +57,9 @@ class Spring:
         self.unit_vec  = diff / length
         self.alignment = abs(np.dot(self.unit_vec, flow_direction))
 
-    # ------------------------------------------------------------------
-    # 2. Tension & Stiffness
-    # ------------------------------------------------------------------
-    def update_cortex(self):
-        """
-        Recompute stiffness and tension from RhoA activation at endpoints. 
-        """
-        mech = self.cfg['mechanics']
-
         # Get RhoA from mean of endpoints nodes
         mean_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
         delta_rhoa = max(mean_rhoa - self.lut.rhoa_rest, 0.0) # get RhoA activity above rest
-        rhoa_max = mech['delta_rhoa_max']
 
         # Recompute stiffness from updated RhoA activation
         self.k_active = self.k_cortex * (
@@ -83,11 +74,9 @@ class Spring:
             kc_ratio=mech['kc_ratio']
         )
 
-
     # ------------------------------------------------------------------
-    # 3. Force application
+    # Force application
     # ------------------------------------------------------------------
-
     def apply_forces(self):
         """
         Equal and opposite cortical forces on connected nodes.
@@ -98,28 +87,35 @@ class Spring:
         self.node_1.apply_force(force_vec)
         self.node_2.apply_force(-force_vec)
 
+    # ------------------------------------------------------------------
+    # Getters
+    # ------------------------------------------------------------------
+    def get_spring_force(self):
+        return float(np.linalg.norm(self.t_cortex * self.unit_vec))
+
 
     # ------------------------------------------------------------------
     # Diagnostics
     # ------------------------------------------------------------------
     def get_state(self):
-        threshold  = self.cfg['cell_geometry'].get('polar_threshold', 0.85)
-        population = 'lateral' if self._init_alignment > threshold else 'polar'
+        # threshold  = self.cfg['cell_geometry'].get('polar_threshold', 0.85)
+        # population = 'lateral' if self._init_alignment > threshold else 'polar'
 
         return {
-            'id':             self.id,
-            'population':     population,
-            'L_current':      round(self.L_current,      4),
-            'L_cortex':       round(self.L_cortex,       4),
-            'k_active':       round(self.k_active,       4),
-            'alignment':      round(self.alignment,       3),
-            'init_alignment': round(self._init_alignment, 3),
-            'tension':        round(self.t_cortex,         4),
+            'id': self.id,
+            'side': self.side,
+            'L_current': round(self.L_current, 4),
+            'L_cortex': round(self.L_cortex, 4),
+            'k_active': round(self.k_active, 4),
+            'alignment': round(self.alignment, 3),
+         #   'init_alignment': round(self._init_alignment, 3),
+            'tension': round(self.t_cortex, 4),
         }
 
     def __repr__(self):
         return (
             f"Spring(id={self.id} | "
+            f"side={self.side} | "
             f"L={self.L_current:.3f} L0={self.L_cortex:.3f} | "
             f"k={self.k_active:.3f} | "
             f"T={self.t_cortex:.4f})"

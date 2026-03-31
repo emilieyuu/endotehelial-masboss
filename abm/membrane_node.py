@@ -36,7 +36,7 @@ class MembraneNode:
         """
         tau_dsp  = max(self.f_normal, 0.0)   # tensile component — local
         tau_tjp1 = self.f_total # full shear magnitude — global
-        tau_jcad = max(self.f_normal, 0.0) # same as DSP for now
+        tau_jcad = max(self.f_normal, 0.0) # same as DSP 
 
         self.DSP  = get_protein_recruitment(self.cfg, tau_dsp, 'DSP')
         self.TJP1 = get_protein_recruitment(self.cfg, tau_tjp1, 'TJP1')

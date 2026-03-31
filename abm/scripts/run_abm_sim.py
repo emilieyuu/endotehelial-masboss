@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import copy 
 from datetime import datetime
 
-from abm_v1.flow_field import FlowField
-from abm_v1.endothelial_cell import EndothelialCell
+from abm.flow_field import FlowField
+from abm.endothelial_cell import EndothelialCell
 from src.utils import save_df_to_csv
 
 # --------------------------------------------------

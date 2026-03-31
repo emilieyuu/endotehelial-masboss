@@ -37,3 +37,11 @@ def bilinear_tension(l_current, l_rest, k_tensile, kc_ratio):
         # Compression Regime: tension < 0, pushes nodes aåart 
         k_comp = k_tensile * kc_ratio
         return k_comp * extension 
+    
+def activated_hookes(l_current, l_rest, k, a):
+    """
+    Activation-Gated Hooke's Law used for Stress Fibre Contractility.     
+    """
+    extension = l_current - l_rest
+    return max(k * a * extension, 0.0)
+    

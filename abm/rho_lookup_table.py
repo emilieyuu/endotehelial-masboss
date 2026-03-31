@@ -5,6 +5,8 @@
 import pandas as pd
 import numpy as np
 from scipy.interpolate import NearestNDInterpolator
+from scipy.interpolate import LinearNDInterpolator
+
 
 class RhoLookupTable: 
     def __init__(self, cfg, recruitment_dir):
@@ -44,8 +46,8 @@ class RhoLookupTable:
 
         points = recr_df[['$DSP_recruitment','$TJP1_recruitment','$JCAD_recruitment']].values
 
-        rhoA_interp = NearestNDInterpolator(points, recr_df['RhoA'].values)
-        rhoC_interp = NearestNDInterpolator(points, recr_df['RhoC'].values)
+        rhoA_interp = LinearNDInterpolator(points, recr_df['RhoA'].values)
+        rhoC_interp = LinearNDInterpolator(points, recr_df['RhoC'].values)
 
         print(f">>> DEBUG: Successfully built interpolators")
 
@@ -64,5 +66,12 @@ class RhoLookupTable:
             float(np.clip(p_tjp1, 0.0, 1.0)),
             float(np.clip(p_jcad, 0.0, 1.0)),
         ]]
-
-        return float(self.rhoA_interp(pt)), float(self.rhoC_interp(pt))
+        rhoa = float(self.rhoA_interp(pt))
+        rhoc = float(self.rhoC_interp(pt))
+        
+        # Fallback if outside convex hull
+        if np.isnan(rhoa) or np.isnan(rhoc):
+            rhoa = float(self.rhoA_nearest(pt))
+            rhoc = float(self.rhoC_nearest(pt))
+        
+        return rhoa, rhoc

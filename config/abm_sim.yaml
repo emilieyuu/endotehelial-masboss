@@ -73,7 +73,7 @@ cell_geometry:
     # Sets initial spring rest lengths: L₀ = 2π × radius / n_nodes ≈ 4.7 µm.
     # Sets initial area: π × radius × (radius × init_ar) ≈ 540 µm² at AR 1.2.
 
-  init_ar: 1.2
+  init_ar: 1.1
     # Initial aspect ratio (semi-major / semi-minor along flow axis).
     # Seeds RhoA spatial gradient — poles get more f_normal than flanks.
     # Biologically: cells are never perfectly circular in vivo.
@@ -198,7 +198,7 @@ mechanics:
     # Controls magnitude of inward pull on FA poles.
     # SWEPT in parameter sweep.
 
-  nu_sf: 0.3
+  nu_sf: 0.5
     # Poisson squeeze coupling coefficient.
     # F_squeeze = -nu_sf × a_sf × (d / max_d) × sign(d) ĵ
     # Converts axial SF tension to lateral compression.
@@ -225,7 +225,7 @@ mechanics:
     # collapse inward). At k_fa=2, k_sf=0.4: FA force dominates.
     # Biologically: mature FAs are mechanically stiff anchors.
     # NOT SWEPT — constrained by k_fa > k_sf requirement.
-
+  fa_sf_gain: 1.5
   tau_fa_relax: 300.0
     # FA slip-bond relaxation timescale (minutes).
     # When FA force < fa_slip_threshold, ratchet position drifts back

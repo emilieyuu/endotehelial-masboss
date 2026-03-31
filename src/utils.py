@@ -1,6 +1,7 @@
 # src/utils.py
 from datetime import datetime
 from pathlib import Path
+import numpy as np
 
 
 def save_df_to_csv(df, out_dir, base_name, timestamp=False):
@@ -25,3 +26,7 @@ def save_df_to_csv(df, out_dir, base_name, timestamp=False):
     df.to_csv(path, index=False)
     print(f">>> INFO: Saved {path.name} to {out_dir}")
     return path
+
+def safe_mean(lst):
+    mean = float(np.mean(lst)) if lst else 0.0
+    return round(mean, 3)

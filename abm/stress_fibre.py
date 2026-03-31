@@ -6,7 +6,7 @@
 # Two mechanical effects:
 #   1. Axial cable tension  — pulls FA nodes toward each other
 #   2. Lateral squeeze — inward force on boundary nodes near each cable
-
+#
 # Biology:
 #   Actomyosin bundle spanning the cell along the flow axis.
 #   Generates active contractile tension when RhoC is active.
@@ -14,6 +14,7 @@
 #   Longer cell → more myosin motors engaged → more tension.
 #
 import numpy as np
+from abm.mechanics import activated_hookes
 
 class StressFibre:
     """
@@ -33,7 +34,7 @@ class StressFibre:
             1 = full contraction (DSP-KO)
     """
 
-    def __init__(self, node_upstream, node_downstream, cfg):
+    def __init__(self, node_upstream, node_downstream, rest_length,  cfg):
         self.node_upstream   = node_upstream
         self.node_downstream = node_downstream
         self.cfg             = cfg
@@ -44,16 +45,17 @@ class StressFibre:
         self.nu_sf = mech.get('nu_sf', 0.3) # Poisson ratio
         self.a_sf = 0.0  # set each step by EndothelialCell
         self.t_sf = 0.0 # axial cable tension
+        self.L_sf = rest_length
 
         # Geometry 
         self.L_current = 0.0
         self.unit_vec  = np.zeros(2)
-        self.cable_y = 0.0 # y midpoint of cable — squeeze reference
+        self.cable_mid = 0.0 # y midpoint of cable — squeeze reference
 
     # ------------------------------------------------------------------
-    # 1. Geometry and tension
+    # Update: Geometry and Tension
     # ------------------------------------------------------------------
-    def update_geometry_and_tension(self):
+    def update(self):
         """
         Recompute cable length, unit vector, y midpoint, and tension.
 
@@ -70,35 +72,21 @@ class StressFibre:
 
         self.L_current = length
         self.unit_vec  = diff / length
-        self.cable_y   = 0.5 * (self.node_upstream.pos[1] + self.node_downstream.pos[1])
-        self.t_sf = self.k_sf * self.a_sf #* self.L_current
+        self.cable_mid = 0.5 * (self.node_upstream.pos + self.node_downstream.pos)
 
-
-    # ------------------------------------------------------------------
-    # 2. Axial cable forces on FA nodes
-    # ------------------------------------------------------------------
-
-    def apply_forces(self):
-        """
-        Pull upstream and downstream FA nodes toward each other.
-
-        Combined with FA anchoring (which resists inward movement),
-        this creates a stable equilibrium at the elongated length:
-            - Without SF: cortex recoil wins → cell rounds up
-            - With SF: cable tension + FA anchoring balance cortex → stays elongated
-        """
-        if self.t_sf < 1e-10:
-            return
-
-        force = self.t_sf * self.unit_vec
-        self.node_upstream.apply_force(force) # pulled in +x, towards downstream
-        self.node_downstream.apply_force(-force) # pulled in -x, towards upstream
+        # Compute cable tension from Hooke's Law
+        self.t_sf = activated_hookes(
+            l_current=self.L_current, 
+            l_rest=self.L_sf, 
+            k=self.k_sf,
+            a=self.a_sf, 
+        )
 
     # ------------------------------------------------------------------
     # 3. Squeeze force — called by EndothelialCell per boundary node
     # ------------------------------------------------------------------
 
-    def get_squeeze_force(self, node_y, max_y_distance):
+    def get_squeeze_force(self, node, max_perp_distance):
         """
         Lateral squeeze force magnitude for a node at position node_y.
 
@@ -115,36 +103,20 @@ class StressFibre:
         max_y_distance:  max |node_y - cable_y| across all boundary nodes
                          computed by EndothelialCell before calling this
         """
-        if self.a_sf < 1e-6 or max_y_distance < 1e-10:
+        if self.a_sf < 1e-6 or max_perp_distance < 1e-10:
             return 0.0
+        ux, uy = self.unit_vec
+        perp = np.array([-uy, ux])
 
-        perb_dist = node_y - self.cable_y
-        weight = abs(perb_dist) / max_y_distance
-        return -self.nu_sf * self.a_sf * weight * np.sign(perb_dist)
+        perp_dist = np.dot(node.pos - self.cable_mid, perp)
+        weight = abs(perp_dist) / max_perp_distance
+
+        return -self.nu_sf * self.t_sf * weight * np.sign(perp_dist)
+    
 
     # ------------------------------------------------------------------
     # Diagnostics
     # ------------------------------------------------------------------
-    def get_squeeze_profile(self, nodes):
-        """
-        Returns squeeze force applied to each node.
-        Used for diganostics and debugging. 
-        """
-        if self.a_sf < 1e-6:
-            return {}
-
-        max_y = max(abs(n.pos[1] - self.cable_y) for n in nodes)
-        if max_y < 1e-10:
-            return {}
-
-        profile = {}
-
-        for n in nodes:
-            f = self.get_squeeze_force(n.pos[1], max_y)
-            profile[n.id] = round(f, 4)
-
-        return profile
-
     def get_state(self):
         return {
             "length": float(self.L_current),
