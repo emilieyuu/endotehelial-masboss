@@ -52,6 +52,8 @@ def measure_forces(cell):
     pole_fn = safe_mean([n.f_normal for n in pole_nodes])
     lat_fn  = safe_mean([n.f_normal for n in lat_nodes])
 
+    total_ft = safe_mean([n.f_tangential for n in cell.nodes])
+
     # --- Cortical tension ---
     pole_tension   = safe_mean([s.t_cortex for s in pole_springs])
     lat_tension    = safe_mean([s.t_cortex for s in lat_springs])
@@ -80,16 +82,14 @@ def measure_forces(cell):
                 max_squeeze = f
 
     # --- FA anchoring ---
-    k_fa_base  = cell.cfg['mechanics']['k_fa']
-    fa_sf_gain = cell.cfg['mechanics'].get('fa_sf_gain', 0.0)
-    k_fa       = k_fa_base * (1.0 + fa_sf_gain * cell.a_sf)
-
+    k_fa_base = cell.cfg['mechanics'].get('k_fa', 2.0)
+    k_fa = k_fa_base * (1.0 + cell.a_sf)
+    
     fa_forces = []
-    for node in cell.nodes:
-        if node.id not in cell.fa_nodes:
-            continue
-        disp       = node.pos - cell.fa_max_displacement[node.id]
-        axial_disp = np.dot(disp, cell.flow_direction)
+    for node_id, fa_pos in cell.fa_positions.items():
+        node = cell.nodes[node_id]
+        disp = node.pos - fa_pos
+        axial_disp = np.dot(disp, cell.flow_direction) * cell.flow_direction
         fa_forces.append(abs(k_fa * axial_disp))
 
     # --- Area conservation ---
@@ -102,6 +102,7 @@ def measure_forces(cell):
         'shear_fn_pole':     round(pole_fn, 3),
         'shear_fn_lat':      round(lat_fn, 3),
         'shear_fn_diff':     round(pole_fn - lat_fn, 3),
+        'shear_tangential':   total_ft,
 
         # Cortex resistance
         'cortex_T_pole':     round(pole_tension, 4),

@@ -101,7 +101,7 @@ flow:
     # Flow direction unit vector (+x axis = laminar flow).
     # Fixed — model assumes unidirectional laminar shear.
 
-  drag_fraction: 0.1
+  drag_fraction: 0.2
     # Mechanical drag force as fraction of f_magnitude.
     # Pole drag = f_magnitude × drag_fraction = 1.5 pN at f_mag=15.
     # Small directional trigger: pushes upstream/downstream nodes apart.
@@ -139,23 +139,20 @@ flow:
 # -----------------------------------------------------------------------------
 hill_params:
   DSP:
-    K: 3.0              # f_magnitude / 5 = 15/5 = 3.0
-    K_divisor: 5
-    n: 3                # moderate cooperativity — tensile junction sensor
+    K_divisor: 4  # f_magnitude/4
+    n: 3 # moderate cooperativity — tensile junction sensor
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false   # set true for DSP_KO perturbation
 
   TJP1:
-    K: 3.0              # same rule: f_magnitude / 5
-    K_divisor: 5
-    n: 2                # low cooperativity — total shear sensor
-    p_max: 0.67         # MaBoSS LUT ceiling — fixed
+    K_divisor: 6 # f_magnitude/6
+    n: 2 # low cooperativity — total shear sensor
+    p_max: 0.67 # MaBoSS LUT ceiling — fixed
     knocked_out: false
 
   JCAD:
-    K: 3.0              # same rule: f_magnitude / 5
     K_divisor: 5
-    n: 4                # high cooperativity — sharp pole amplifier
+    n: 4 # high cooperativity — sharp pole amplifier
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false
 
@@ -177,7 +174,7 @@ mechanics:
     # Standard in cortical models (Salbreux et al. 2012).
     # NOT SWEPT — well-constrained by biophysics.
 
-  rhoa_k_gain: 15.0
+  rhoa_k_gain: 5.0
     # RhoA-dependent stiffening gain.
     # k_active = k_cortex × (1 + rhoa_k_gain × delta_RhoA)
     # At full RhoA activation (delta_RhoA ≈ 0.12 above rest):
@@ -186,19 +183,14 @@ mechanics:
     # Key regulator of TJP1_KO phenotype (high RhoA → stiff → low AR).
     # SWEPT in parameter sweep.
 
-  # Maximum reachable delta RhoA for k_cortex normalisation
-  delta_rhoa_max: 0.302
-      # From LUT: max P_RhoA ≈ 0.765, rest = 0.463, delta_max ≈ 0.302
-
-
   # --- Stress fibre ---
-  k_sf: 0.4
+  k_sf: 0.8
     # SF cable stiffness (pN). Tension: t_sf = k_sf × a_sf.
     # No rest length — purely active/contractile.
     # Controls magnitude of inward pull on FA poles.
     # SWEPT in parameter sweep.
 
-  nu_sf: 0.5
+  nu_sf: 0.6
     # Poisson squeeze coupling coefficient.
     # F_squeeze = -nu_sf × a_sf × (d / max_d) × sign(d) ĵ
     # Converts axial SF tension to lateral compression.
@@ -219,29 +211,16 @@ mechanics:
     # NOT SWEPT — biologically constrained.
 
   # --- Focal adhesion ---
-  k_fa: 4.0
+  k_fa: 0.8
     # FA spring stiffness (pN/µm). Resists displacement from ratchet.
     # Must be > k_sf so FAs resist SF contraction (otherwise poles
     # collapse inward). At k_fa=2, k_sf=0.4: FA force dominates.
     # Biologically: mature FAs are mechanically stiff anchors.
     # NOT SWEPT — constrained by k_fa > k_sf requirement.
-  fa_sf_gain: 1.5
-  tau_fa_relax: 300.0
-    # FA slip-bond relaxation timescale (minutes).
-    # When FA force < fa_slip_threshold, ratchet position drifts back
-    # toward initial position at rate dt / tau_fa_relax.
-    # Much slower than tau_remodel (300 vs 30 min) — FAs persist
-    # after SF remodelling, which is biologically correct (FAs are
-    # slower to disassemble than SFs). NOT SWEPT.
-
-  fa_slip_threshold: 0.1
-    # Minimum FA force (pN) to maintain ratchet position.
-    # Below this, FA is considered unloaded → begins relaxing.
-    # Small value — only triggers when SF tension drops near zero.
-    # NOT SWEPT — qualitative threshold, not sensitive.
+  #fa_sf_gain: 1.5
 
   # --- Area conservation ---
-  k_area: 0.8
+  k_area: 0.5
     # Area conservation penalty stiffness (pN/µm²).
     # Pressure = k_area × (target_area - current_area).
     # Soft constraint — must be weak enough that SF/cortex drive shape,

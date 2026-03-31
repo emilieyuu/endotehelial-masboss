@@ -44,6 +44,7 @@ class StressFibre:
         self.k_sf = mech.get('k_sf', 0.5) # cable stiffness, portion of cortex
         self.nu_sf = mech.get('nu_sf', 0.3) # Poisson ratio
         self.a_sf = 0.0  # set each step by EndothelialCell
+        #elf.a_sf = mech.get('a_sf', 0.4)
         self.t_sf = 0.0 # axial cable tension
         self.L_sf = rest_length
 
@@ -105,6 +106,7 @@ class StressFibre:
         """
         if self.a_sf < 1e-6 or max_perp_distance < 1e-10:
             return 0.0
+        
         ux, uy = self.unit_vec
         perp = np.array([-uy, ux])
 

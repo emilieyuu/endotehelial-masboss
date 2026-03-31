@@ -16,11 +16,7 @@ groups:
   junctions:  ["DSP", "TJP1", "JCAD"]
 
 experiments: 
-  - name: "Recruitment_Sweep"
-    perturbations: ["WT"]
-    type: "1D"
-    resolution: "fine"
-    parameters: ["$DSP_recruitment", "$TJP1_recruitment", "$JCAD_recruitment"]
+  # 1D Experiements
   - name: "WT_Sweep"
     perturbations: ["WT"]
     type: "1D"
@@ -56,6 +52,8 @@ experiments:
     type: "1D"
     resolution: "fine"
     parameters: ["$RhoA_basal", "$RhoC_basal"]
+
+  # --- 2D Experiments ---
   - name: "Competition_Landscape"
     perturbations: ["WT", "TJP1_KO", "DSP_KO"]
     type: "2D"
@@ -71,6 +69,7 @@ experiments:
     type: "2D"
     resolution: "coarse"
     parameters: ["$RhoC_amp", "$RhoC_antagonistic"]
+
   - name: "Amplification_Gain_RhoA"
     perturbations: ["WT", "JCAD_KO", "TJP1_JCAD_DKO"]
     type: "2D"
@@ -81,11 +80,25 @@ experiments:
     type: "2D"
     resolution: "coarse"
     parameters: ["$RhoC_amp", "$RhoC_mod"]
+
+  - name: "Moderate_Gain_RhoA"
+    perturbations: ["WT", "JCAD_KO", "TJP1_JCAD_DKO"]
+    type: "2D"
+    resolution: "coarse"
+    parameters: ["$RhoA_mod", "$RhoA_basal"]
+  - name: "Moderate_Gain_RhoC"
+    perturbations: ["WT", "JCAD_KO", "DSP_JCAD_DKO"]
+    type: "2D"
+    resolution: "coarse"
+    parameters: ["$RhoC_mod", "$RhoC_basal"]
+  
   - name: "Basal_Activity_Robustness"
     perturbations: ["WT"]
     type: "2D"
     resolution: "coarse"
     parameters: ["$RhoA_basal", "$RhoC_basal"]
+  
+  # --- 3D Experiment ---
   - name: "Joint_Recr_Sweep"
     perturbations: ["WT"]
     type: "3D"

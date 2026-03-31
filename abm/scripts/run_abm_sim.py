@@ -27,20 +27,20 @@ def get_perb_cfg(cfg_base, knockouts):
 
     return cfg
 
-def get_spring_states(cell, exp_dict) -> list:
-    """
-    Return state of all springs as a list of dicts.
-    Suitable for building a DataFrame across conditions and timesteps.
+# def get_spring_states(cell, exp_dict) -> list:
+#     """
+#     Return state of all springs as a list of dicts.
+#     Suitable for building a DataFrame across conditions and timesteps.
 
-    condition: optional label (e.g. 'WT', 'DSP-KO')
-    step:      optional step number
-    time:  optional time in minutes
-    """
-    rows = []
-    for s in cell.springs:
-        state = s.get_state()
-        rows.append({**exp_dict, **state})
-    return pd.DataFrame(rows)
+#     condition: optional label (e.g. 'WT', 'DSP-KO')
+#     step:      optional step number
+#     time:  optional time in minutes
+#     """
+#     rows = []
+#     for s in cell.springs:
+#         state = s.get_state()
+#         rows.append({**exp_dict, **state})
+#     return pd.DataFrame(rows)
 
 def plot_cell(cell, title=''):
     """
@@ -75,12 +75,17 @@ def plot_cell(cell, title=''):
 # Single Perturbation Sim
 # --------------------------------------------------
 
-def run_abm_sim_single(cfg, lut, perturbation, n_steps, plot=False):
-    dt = cfg['sim'].get('dt', 0.1)
-    n_nodes = cfg['sim'].get('n_nodes', 16)
-    radius = cfg['sim'].get('radius', 12)
-    f_magnitude = cfg['mechanics'].get('f_magnitude', 12)
+def run_abm_sim_single(cfg, lut, n_steps, perturbation = 'WT', plot=False):
+    """
+    Run full step-pipeline for a single cell under a single perturbation. 
+    """
+    # Extract simulation parameters from config
+    dt = cfg['integration'].get('dt', 0.1)
+    n_nodes = cfg['cell_geometry'].get('n_nodes', 16)
+    radius = cfg['cell_geometry'].get('radius', 12)
+    f_magnitude = cfg['flow'].get('f_magnitude', 12)
 
+    # Initiate flowfield and cell
     flow = FlowField(magnitude=f_magnitude)
     cell = EndothelialCell( 
         cell_id=0, centroid=np.array([0.0, 0.0]),
@@ -88,11 +93,14 @@ def run_abm_sim_single(cfg, lut, perturbation, n_steps, plot=False):
         n_nodes=n_nodes, radius=radius,
         flow_direction=flow.direction
     )
-    if plot:
-        plot_cell(cell)
-    cell_rows = []
-    spring_dfs = []
 
+
+
+    # Initiate lists to store results
+    cell_rows = []
+    diagnostic_rows = []
+
+    # Time loop
     for step in range(n_steps):
         cell.step(flow, dt=dt)
         if step % 50 == 0 or step == n_steps - 1:
@@ -100,67 +108,75 @@ def run_abm_sim_single(cfg, lut, perturbation, n_steps, plot=False):
 
             exp_dict = {'step': step, 'time': time, 'perturbation': perturbation}
             state = cell.get_state()
+            diags = cell.get_diagnostics()
 
             cell_rows.append({**exp_dict, **state})
-            spring_dfs.append(get_spring_states(cell, exp_dict))
+            diagnostic_rows.append({**exp_dict, **diags})
 
     cell_df = pd.DataFrame(cell_rows)
-    spring_df = pd.concat(spring_dfs, ignore_index=True)
+    diags_df = pd.DataFrame(diagnostic_rows)
+    # Optionally plot cell at initiation
+    if plot:
+        plot_cell(cell)
 
     return {
         'perb': perturbation,
         'cell_df': cell_df,
-        'spring_df': spring_df,
+        'diagnostics': diags_df,
         'cell_final': cell.get_state(),
-        'spring_final': spring_dfs[-1],
+        'diagnostics_final': cell.get_diagnostics(),
         'cell': cell
     }
 
 # --------------------------------------------------
 # Full Perturbation Sim
 # --------------------------------------------------
-def run_abm_sim(cfg, lut, n_steps=None, result_dir=None):
+def run_abm_sim(cfg, lut, n_steps=None, result_dir=None, plot=False):
     """
     Run all perturbations
 
     Returns:
         timeseries_df:  full cell history across all perturbations
         ss_df:          final state only per perturbation
-        spring_ts_df:   full spring history across all perturbations
-        spring_ss_df:   final spring state only per perturbation
     """
     perbs = cfg['perturbations']
     n_steps = n_steps or cfg['sim']['n_steps']
 
-    cell_histories   = []
-    spring_histories = []
-    ss_rows          = []
-    spring_ss_rows   = []
+    cell_histories = []
+    diag_histories = []
+    ss_rows = []
+    diag_rows = []
 
     for name, perb, in perbs.items(): 
-        #print(f">>> INFO: Running abm simulation perturbation: {name} ({n_steps} steps).")
+        print(f">>> INFO: Running abm simulation perturbation: {name} ({n_steps} steps).")
 
         perb_cfg = get_perb_cfg(cfg_base=cfg, knockouts=perbs[name])
-        result = run_abm_sim_single(perb_cfg, lut, name, n_steps)
+        result = run_abm_sim_single(perb_cfg, lut, n_steps, name, plot)
 
         cell_histories.append(result['cell_df'])
-        spring_histories.append(result['spring_df'])
-        ss_rows.append({'perturbation': name, **result['cell_final']})
-        spring_ss_rows.append(result['spring_final'])
+        diag_histories.append(result['diagnostics'])
 
+        ss_state = result['cell_final']
+
+        ss_rows.append({'perturbation': name, **result['cell_final']})
+        diag_rows.append({'perturbation': name, **result['diagnostics_final']})
+
+        print(f"{name:<18} {result['cell_final']['ar']:>6.3f} {result['cell_final']['orientation']:>8.1f}° "
+                f"{result['cell_final']['a_sf']:>6.3f} {result['cell_final']['mean_rhoa']:>6.3f} "
+                f"{result['cell_final']['mean_rhoc']:>6.3f}")
 
    # print(f">>> INFO: All perturbations completed successfully.")
 
     timeseries_df  = pd.concat(cell_histories,   ignore_index=True)
-    spring_ts_df   = pd.concat(spring_histories, ignore_index=True)
-    ss_df          = pd.DataFrame(ss_rows)
-    spring_ss_df   = pd.concat(spring_ss_rows,   ignore_index=True)
+    diagnostics_ts_df = pd.concat(diag_histories, ignore_index=True)
+    ss_df = pd.DataFrame(ss_rows)
+    diagnostics_ss_df = pd.DataFrame(diag_rows)
 
     if result_dir is not None:
         save_df_to_csv(timeseries_df, result_dir, "abm_timeseries", ts=True)
         save_df_to_csv(ss_df, result_dir, "abm_ss", ts=True)
-        save_df_to_csv(spring_ts_df, result_dir, "abm_spring_timeseries", ts=True)
-        save_df_to_csv(spring_ss_df, result_dir, "abm_spring_ss", ts=True)
+        save_df_to_csv(diagnostics_ts_df, result_dir, "abm_diagnostics_timeseries", ts=True)
+        save_df_to_csv(diagnostics_ss_df, result_dir, "abm_dianostics_ss", ts=True)
         print(f">>> INFO: Results saved to {result_dir}")
 
-    return timeseries_df, ss_df, spring_ts_df, spring_ss_df
+    return timeseries_df, ss_df, diagnostics_ts_df, diagnostics_ss_df
