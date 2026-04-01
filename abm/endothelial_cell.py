@@ -52,7 +52,7 @@ class EndothelialCell:
         # Build node ring and classify
         self.nodes = self._init_node_ring(centroid, n_nodes, radius, lut, cfg)
         self._classify_nodes()
-        self.springs = self._init_springs(lut, cfg)
+        self.springs = self._init_springs(n_nodes, cfg)
         
         # Build FA nodes and SF cables
         self.fa_positions, self.stress_fibre = self._init_fa_and_sf()
@@ -72,11 +72,14 @@ class EndothelialCell:
         Place n_nodes evenly on a circle, offset by π/2 so node 0
         starts at the top. Pole nodes land on the flow axis.
         """
-        init_ar = self.cfg['cell_geometry'].get('init_ar', 1.0)
-        r_x     = radius * np.sqrt(init_ar)   # semi-axis along flow
-        r_y     = radius / np.sqrt(init_ar)   # semi-axis perpendicular
+        cell_cfg = self.cfg['cell_geometry']
 
+        # Get angles between nodes in circular shape
+        init_ar = cell_cfg.get('init_ar', 1.0)
+        r_x = radius * np.sqrt(init_ar)   # semi-axis along flow
+        r_y = radius / np.sqrt(init_ar)   # semi-axis perpendicular
         angles = np.linspace(0, 2*np.pi, n_nodes, endpoint=False) + np.pi/2
+
         nodes  = []
         for i, angle in enumerate(angles):
             pos = np.array([
@@ -107,30 +110,27 @@ class EndothelialCell:
             else:
                 node.role = 'lateral'
 
-    def _init_springs(self, lut, cfg):
+    def _init_springs(self, n_nodes, cfg):
         """
         Connect adjacent nodes in a ring.
-        Store _init_alignment frozen at init.
         """
         springs = []
-        for i in range(self.n_nodes):
-            n1 = self.nodes[i]
-            n2 = self.nodes[(i + 1) % self.n_nodes]
 
-            # Classify polar and flank spring from their connecting nodes. 
+        # Create a spring for any two adjacent nodes on the ring. 
+        for i in range(n_nodes):
+            # Get nodes and distance between them 
+            n1 = self.nodes[i]
+            n2 = self.nodes[(i + 1) % n_nodes]
+            dist = np.linalg.norm(n2.pos - n1.pos)
+
+            # Get side from role of connecting nodes 
             if n1.role in ('upstream', 'downstream') or n2.role in ('upstream', 'downstream'):
                 side = 'polar'
             else: 
                 side = 'flank'
 
-            diff = n2.pos - n1.pos
-            dist = np.linalg.norm(diff)
-
-            s = Spring(
-                spring_id=i, node_1=n1, node_2=n2,
-                rest_length=dist, side=side, 
-                lut=lut, cfg=cfg
-            )
+            s = Spring(spring_id=i, node_1=n1, node_2=n2,
+                        rest_length=dist, side=side, cfg=cfg)
 
             springs.append(s)
 
@@ -139,11 +139,7 @@ class EndothelialCell:
     def _init_fa_and_sf(self):
         """
         Use only the centre pole node (closest to flow axis) per side.
-        One upstream FA, one downstream FA, one SF cable.
-
-        Off-axis pole nodes are classified as upstream/downstream for
-        signalling purposes but do NOT get FA anchoring — they are free
-        to move laterally, allowing the cell to narrow correctly.
+        One upstream FA, one downstream FA, one SF cabl connecting them. 
         """
         # Find the single node closest to flow axis on each side
         upstream_nodes = [n for n in self.nodes if n.role == 'upstream']
@@ -163,9 +159,7 @@ class EndothelialCell:
         sf_dist = np.linalg.norm(dn_centre.pos - up_centre.pos)
 
         # Single SF cable along flow axis
-        stress_fibre = StressFibre(
-            up_centre, dn_centre, 
-            sf_dist, self.cfg)
+        stress_fibre = StressFibre(up_centre, dn_centre, sf_dist, self.cfg)
 
         return fa_positions, stress_fibre
     # ------------------------------------------------------------------
@@ -362,7 +356,7 @@ class EndothelialCell:
             node.update_signalling()
 
         for s in self.springs:
-            s.update_a_cortex()
+            s.update_activation()
 
         # 12. Global a_sf from updated node P_RhoC
         self.stress_fibre.update_a_sf(

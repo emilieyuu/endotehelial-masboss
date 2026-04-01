@@ -18,26 +18,13 @@ from abm.mechanics import activated_bilinear
 
 class StressFibre:
     """
-    Set of internal SF cables connecting upstream FA nodes to
-    downstream FA nodes across the cell interior.
-
-    Each cable:
-        - Connects one upstream FA node to its paired downstream FA node
-        - Generates axial tension proportional to k_sf x sigma x L_current
-        - Generates lateral squeeze on boundary nodes within influence_radius
-
-    FA positions are fixed at initialisation — substrate anchors.
-    FA anchor force is computed separately in EndothelialCell.
-
-    a_sf: global RhoC activation (contractility) (0-1), set each step by EndothelialCell
-            0 = no fibres (TJP1-KO)
-            1 = full contraction (DSP-KO)
+    An interal Stress Fibre cable connecting the most polar node.s. 
     """
 
-    def __init__(self, node_upstream, node_downstream, rest_length, cfg):
-        self.node_upstream   = node_upstream
-        self.node_downstream = node_downstream
-        self.cfg             = cfg
+    def __init__(self, node_up, node_down, rest_length, cfg):
+        self.node_up = node_up
+        self.node_down = node_down
+        self.cfg = cfg
         self.mech = cfg['mechanics']
 
         # Stress fibre properties
@@ -50,27 +37,23 @@ class StressFibre:
         # Geometry 
         self.L_current = 0.0
         self.unit_vec  = np.zeros(2)
-        self.cable_mid = 0.0 # y midpoint of cable — squeeze reference
+        self.cable_mid = 0.0 # Mid-ponint (x, y) of cable
+
 
     # ------------------------------------------------------------------
-    # Getters
-    # ------------------------------------------------------------------
-    def get_sf_activation(self):
-        return self.a_sf
-
-    # ------------------------------------------------------------------
-    # Update: Geometry and Tension
+    # 1. Update Geometry and Tension
     # ------------------------------------------------------------------
     def update_geometry_and_tension(self):
         """
-        Recompute cable length, unit vector, y midpoint, and tension.
+        Recompute cable length and tension at the beginning of each timestep. 
 
         t_sf = k_sf × a_sf × L_current
             Active pretension — no rest length.
             Proportional to activation (a_sf) and length (L_current).
             Longer cell → more fibre engaged → more tension.
         """
-        diff   = self.node_downstream.pos - self.node_upstream.pos
+        # --- Geometry ---
+        diff   = self.node_down.pos - self.node_up.pos
         length = np.linalg.norm(diff)
 
         if length < 1e-10:
@@ -78,10 +61,11 @@ class StressFibre:
 
         self.L_current = length
         self.unit_vec  = diff / length
-        self.cable_mid = 0.5 * (self.node_upstream.pos + self.node_downstream.pos)
+        self.cable_mid = 0.5 * (self.node_up.pos + self.node_down.pos)
 
+        # --- Tension ---
         k_sf = self.mech['k_sf_fraction'] * self.mech['k_cortex']
-        kc_ratio = self.mech['k_sf_fraction'] * self.mech['kc_ratio']
+        kc_ratio = self.mech['kc_ratio'] #* self.mech['k_sf_fraction'] 
 
         self.t_sf = activated_bilinear(
             l_current=self.L_current,
@@ -166,7 +150,7 @@ class StressFibre:
 
             "force_vector": (self.t_sf * self.unit_vec).copy(),
 
-            "cable_y": float(self.cable_y),
+            "cable_mid": float(self.cable_mid),
             "contractility": float(self.a_sf),
         }
 
@@ -176,5 +160,5 @@ class StressFibre:
             f"L={self.L_current:.3f} | "
             f"contractility={self.a_sf:.3f} | "
             f"T_sf={self.t_sf:.4f} | "
-            f"cable_y={self.cable_y:.3f})"
+            f"cable_mid={self.cable_mid:.3f})"
         )
