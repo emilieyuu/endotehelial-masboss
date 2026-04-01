@@ -247,7 +247,7 @@ class EndothelialCell:
             Zero at flanks (normal ⊥ flow → zero projection).
             Stored on node, read by update_signalling() this step.
         """
-        f_magnitude   = flow_field.magnitude
+        f_magnitude = flow_field.magnitude
         drag_fraction = self.cfg['flow'].get('drag_fraction', 0.1)
         drag = f_magnitude * drag_fraction
 
@@ -359,10 +359,8 @@ class EndothelialCell:
             s.update_activation()
 
         # 12. Global a_sf from updated node P_RhoC
-        self.stress_fibre.update_a_sf(
-            global_rhoc=self.rhoc_mean, 
-            rhoc_baseline=self.lut.rhoc_rest, 
-            dt=dt
+        self.stress_fibre.update_activation(
+            mean_rhoc=self.rhoc_mean, rhoc_rest=self.lut.rhoc_rest, dt=dt
         )
 
         # 13. Sync area

@@ -29,14 +29,13 @@ class StressFibre:
 
         # Stress fibre properties
         self.L_sf = rest_length
-        self.nu_sf = self.mech.get('nu_sf', 0.3) # Poisson ratio
-
         self.a_sf = 0.0  
         self.t_sf = 0.0 # axial cable tension
 
         # Geometry 
         self.L_current = 0.0
-        self.unit_vec  = np.zeros(2)
+        self.unit_vec = np.zeros(2)
+        self.perp_unit = np.zeros(2)
         self.cable_mid = 0.0 # Mid-ponint (x, y) of cable
 
 
@@ -61,24 +60,22 @@ class StressFibre:
 
         self.L_current = length
         self.unit_vec  = diff / length
+        self.perp_unit = np.array([-self.unit_vec[1], self.unit_vec[0]])
         self.cable_mid = 0.5 * (self.node_up.pos + self.node_down.pos)
 
         # --- Tension ---
-        k_sf = self.mech['k_sf_fraction'] * self.mech['k_cortex']
-        kc_ratio = self.mech['kc_ratio'] #* self.mech['k_sf_fraction'] 
+        k_cortex = self.mech.get('k_cortex', 1.0)
+        k_sf = self.mech.get('k_sf_fraction', 0.5) * k_cortex
+        kc_ratio = self.mech.get('kc_ratio', 0.1) 
 
         self.t_sf = activated_bilinear(
-            l_current=self.L_current,
-            l_rest=self.L_sf,
-            k=k_sf,
-            kc_ratio=kc_ratio, 
-            a=self.a_sf
+            l_current=self.L_current, l_rest=self.L_sf,
+            k=k_sf, kc_ratio=kc_ratio, a=self.a_sf
         ) 
 
     # ------------------------------------------------------------------
-    # 3. Squeeze force — called by EndothelialCell per boundary node
+    # 2. Apply Forces: Axial Contracion + Lateral Squeeze
     # ------------------------------------------------------------------
-
     def apply_forces(self, nodes, positions):
         if self.t_sf < 1e-10:
             return
@@ -87,11 +84,16 @@ class StressFibre:
         self._apply_lateral_squeeze(nodes, positions)
     
     def _apply_axial_forces(self, nodes):
+        """
+        Contractile pull force along stress fibre axis. 
+
+        Force is distributed evenly between all "polar" nodes to prevent deformation.
+        """
+        # Force as tension (magnitude) * direction
         force = self.t_sf * self.unit_vec
 
         upstream_nodes = [n for n in nodes if n.role == "upstream"]
         downstream_nodes = [n for n in nodes if n.role == "downstream"]
-
         n = len(upstream_nodes)
 
         if n == 0:
@@ -104,36 +106,41 @@ class StressFibre:
             node.apply_force(-force/n)
 
     def _apply_lateral_squeeze(self, nodes, positions):
+        """
+        Lateral squeeze force on lateral nodes. 
+        Weighed by perpendicular distance to SF cable. 
+        """
         if self.a_sf < 1e-6:
             return
-        
-        ux, uy = self.unit_vec
-        perp_unit = np.array([-uy, ux])
 
         # Vectorised signed perpendicular distances
         rel = positions - self.cable_mid
-        distances = rel @ perp_unit
-
+        distances = rel @ self.perp_unit
+        
         max_dist = np.max(np.abs(distances))
         if max_dist < 1e-10:
             return
         
         weights = distances / max_dist
-        magnitudes = -self.nu_sf * self.t_sf * weights
+        nu_sf = self.mech.get('nu_sf', 0.6)
+        forces = -nu_sf * self.t_sf * weights
 
         # Apply forces
-        for node, mag in zip(nodes, magnitudes):
-            if abs(mag) > 1e-10:
-                node.apply_force(mag * perp_unit)
+        for node, force in zip(nodes, forces):
+            if abs(force) > 1e-10:
+                node.apply_force(force * self.perp_unit)
 
     # ------------------------------------------------------------------
-    # Update SF Activation
+    # 3. Update Activation
     # ------------------------------------------------------------------
-    def update_a_sf(self, global_rhoc, rhoc_baseline, dt):
-        if global_rhoc <= rhoc_baseline:
+    def update_activation(self, mean_rhoc, rhoc_rest, dt):
+        """
+        
+        """
+        if mean_rhoc <= rhoc_rest:
             target = 0.0
         else:
-            target = (global_rhoc - rhoc_baseline) / (1.0 - rhoc_baseline)
+            target = (mean_rhoc - rhoc_rest) / (1.0 - mean_rhoc)
 
         alpha = dt / self.mech.get('tau_remodel', 30)
         self.a_sf += alpha * (target - self.a_sf)
