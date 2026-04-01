@@ -1,6 +1,6 @@
 # abm/spring.py
 import numpy as np
-from abm.mechanics import bilinear_tension
+from abm.mechanics import bilinear_tension, activated_bilinear
 
 class Spring:
     """
@@ -17,7 +17,7 @@ class Spring:
     """
 
     def __init__(self, spring_id, node_1, node_2,
-                 rest_length, side, k_cortex, lut, cfg):
+                 rest_length, side, lut, cfg):
 
         self.id = spring_id
         self.lut = lut
@@ -26,22 +26,23 @@ class Spring:
         self.node_2 = node_2
 
         # Cortical properties
+        mech_cfg = self.cfg['mechanics']
         self.L_cortex = rest_length
-        self.k_cortex = k_cortex
-        self.k_active = k_cortex      # updated each step by EndothelialCell
+        self.k_cortex = mech_cfg['k_cortex']
+        self.a_cortex = 0.95
+        #self.k_active = k_cortex      # updated each step by EndothelialCell
         self.t_cortex = 0.0
 
         # Geometry
         self.L_current = rest_length
         self.unit_vec = np.zeros(2)
         self.alignment = 0.0
-       # self._init_alignment = 0.0    # frozen at init by EndothelialCell
         self.side = side
 
     # ------------------------------------------------------------------
     # Update: Geometry, Stiffness, Tension
     # ------------------------------------------------------------------
-    def update(self, flow_direction):
+    def update_geometry_and_tension(self, flow_direction):
         """
         Recompute length and alignment from current node positions.
         """
@@ -57,18 +58,34 @@ class Spring:
         self.alignment = abs(np.dot(self.unit_vec, flow_direction))
         
         # Direct RhoA scaling — no delta, no rest point
-        mean_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
+        # mean_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
+        # a_cortex = 1.0 + mech['rhoa_k_gain'] * mean_rhoa
+        # self.a_cortex = max(a_cortex, 0.1) # Prevent negative stiffness
 
-        self.k_active = self.k_cortex * mech['rhoa_k_gain'] * mean_rhoa
+        # self.k_active = self.k_cortex * mech['rhoa_k_gain'] * mean_rhoa
         
-        kc_effective = mech['kc_ratio']
+        # kc_effective = mech['kc_ratio']
         
-        self.t_cortex = bilinear_tension(
+        self.t_cortex = activated_bilinear(
             l_current=self.L_current,
             l_rest=self.L_cortex,
-            k_tensile=self.k_active,
-            kc_ratio=kc_effective
-        )
+            k=self.k_cortex,
+            kc_ratio=self.cfg['mechanics']['kc_ratio'],
+            a=self.a_cortex
+        ) 
+
+    # ------------------------------------------------------------------
+    # Update cortex activation (after signalling)
+    # ------------------------------------------------------------------
+    def update_a_cortex(self):
+        mech = self.cfg['mechanics']
+
+        mean_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
+        self.a_cortex = 1.0 + mech['rhoa_k_gain'] * mean_rhoa
+
+        # alpha = dt / mech['tau_remodel']
+        # self.a_cortex += alpha * (a_cortex_target - self.a_cortex)
+        # self.a_cortex = float(np.clip(self.a_cortex, 0.0, 1.0))
 
     # ------------------------------------------------------------------
     # Force application

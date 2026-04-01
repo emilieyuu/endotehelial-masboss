@@ -57,34 +57,35 @@ def measure_forces(cell):
     # --- Cortical tension ---
     pole_tension   = safe_mean([s.t_cortex for s in pole_springs])
     lat_tension    = safe_mean([s.t_cortex for s in lat_springs])
-    pole_stiffness = safe_mean([s.k_active for s in pole_springs])
-    lat_stiffness  = safe_mean([s.k_active for s in lat_springs])
+    a_cortex_pole = safe_mean([s.a_cortex for s in pole_springs])
+    a_cortex_lat  = safe_mean([s.a_cortex for s in lat_springs])
 
     # --- Stress fibre ---
-    sf_tension = safe_mean([sf.t_sf for sf in cell.stress_fibres])
+    sf_tension = safe_mean(cell.stress_fibre.t_sf)
 
     # Peak nodal force from distributed application (50% to centre)
-    sf_node_max = max((sf.t_sf for sf in cell.stress_fibres), default=0.0) * 0.5
+    sf_node_max = sf_tension * 0.5
 
     # Max squeeze magnitude across all lateral nodes
-    max_squeeze = 0.0
-    for sf in cell.stress_fibres:
-        if sf.t_sf < 1e-6:
-            continue
-        ux, uy = sf.unit_vec
-        perp = np.array([-uy, ux])
-        max_d = max(abs(np.dot(n.pos - sf.cable_mid, perp)) for n in cell.nodes)
-        if max_d < 1e-10:
-            continue
-        for n in lat_nodes:
-            f = abs(sf.get_squeeze_force(n, max_d))
-            if f > max_squeeze:
-                max_squeeze = f
+    # max_squeeze = 0.0
+    # sf = cell.stress_fibre
+    # if sf.t_sf < 1e-6:
+    #     continue
+    # ux, uy = sf.unit_vec
+    # perp = np.array([-uy, ux])
+    # max_d = max(abs(np.dot(n.pos - sf.cable_mid, perp)) for n in cell.nodes)
+    # if max_d < 1e-10:
+    #     continue
+
+    # for n in lat_nodes:
+    #     f = abs(sf.get_squeeze_force(n, max_d))
+    #     if f > max_squeeze:
+    #         max_squeeze = f
 
     # --- FA anchoring ---
     k_fa_base = cell.cfg['mechanics'].get('k_fa', 2.0)
     k_fa = k_fa_base * (1.0 + cell.a_sf)
-    
+
     fa_forces = []
     for node_id, fa_pos in cell.fa_positions.items():
         node = cell.nodes[node_id]
@@ -102,18 +103,18 @@ def measure_forces(cell):
         'shear_fn_pole':     round(pole_fn, 3),
         'shear_fn_lat':      round(lat_fn, 3),
         'shear_fn_diff':     round(pole_fn - lat_fn, 3),
-        'shear_tangential':   total_ft,
+        'shear_tangential':  total_ft,
 
         # Cortex resistance
         'cortex_T_pole':     round(pole_tension, 4),
         'cortex_T_lat':      round(lat_tension, 4),
-        'cortex_k_pole':     round(pole_stiffness, 4),
-        'cortex_k_lat':      round(lat_stiffness, 4),
+        'a_cortex_pole':     round(a_cortex_pole, 4),
+        'a_cortex_lat':      round(a_cortex_lat, 4),
 
         # SF elongation drive
         'sf_tension':        round(sf_tension, 4),
         'sf_node_max':       round(sf_node_max, 4),
-        'sf_squeeze_max':    round(max_squeeze, 4),
+       # 'sf_squeeze_max':    round(max_squeeze, 4),
         'a_sf':              round(cell.a_sf, 4),
 
         # FA stabilisation

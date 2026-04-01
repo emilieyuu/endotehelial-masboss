@@ -14,7 +14,7 @@
 #   Longer cell → more myosin motors engaged → more tension.
 #
 import numpy as np
-from abm.mechanics import activated_hookes
+from abm.mechanics import activated_bilinear
 
 class StressFibre:
     """
@@ -34,19 +34,21 @@ class StressFibre:
             1 = full contraction (DSP-KO)
     """
 
-    def __init__(self, node_upstream, node_downstream, rest_length,  cfg):
+    def __init__(self, node_upstream, node_downstream, rest_length, cfg):
         self.node_upstream   = node_upstream
         self.node_downstream = node_downstream
         self.cfg             = cfg
+        self.mech = cfg['mechanics']
+
 
         # Stress fibre properties
         mech = cfg['mechanics']
-        self.k_sf = mech.get('k_sf', 0.5) # cable stiffness, portion of cortex
-        self.nu_sf = mech.get('nu_sf', 0.3) # Poisson ratio
-        self.a_sf = 0.0  # set each step by EndothelialCell
-        #elf.a_sf = mech.get('a_sf', 0.4)
-        self.t_sf = 0.0 # axial cable tension
         self.L_sf = rest_length
+        self.k_sf = self.mech.get('k_sf', 0.5) # cable stiffness, portion of cortex
+        self.nu_sf = self.mech.get('nu_sf', 0.3) # Poisson ratio
+
+        self.a_sf = 0.0  
+        self.t_sf = 0.0 # axial cable tension
 
         # Geometry 
         self.L_current = 0.0
@@ -54,9 +56,15 @@ class StressFibre:
         self.cable_mid = 0.0 # y midpoint of cable — squeeze reference
 
     # ------------------------------------------------------------------
+    # Getters
+    # ------------------------------------------------------------------
+    def get_sf_activation(self):
+        return self.a_sf
+
+    # ------------------------------------------------------------------
     # Update: Geometry and Tension
     # ------------------------------------------------------------------
-    def update(self):
+    def update_geometry_and_tension(self):
         """
         Recompute cable length, unit vector, y midpoint, and tension.
 
@@ -76,45 +84,83 @@ class StressFibre:
         self.cable_mid = 0.5 * (self.node_upstream.pos + self.node_downstream.pos)
 
         # Compute cable tension from Hooke's Law
-        self.t_sf = activated_hookes(
-            l_current=self.L_current, 
-            l_rest=self.L_sf, 
+        # self.t_sf = activated_hookes(
+        #     l_current=self.L_current, 
+        #     l_rest=self.L_sf, 
+        #     k=self.k_sf,
+        #     a=self.a_sf, 
+        # )
+        self.t_sf = activated_bilinear(
+            l_current=self.L_current,
+            l_rest=self.L_sf,
             k=self.k_sf,
-            a=self.a_sf, 
-        )
+            kc_ratio=self.cfg['mechanics']['kc_ratio']*self.k_sf, 
+            a=self.a_sf
+        ) 
 
     # ------------------------------------------------------------------
     # 3. Squeeze force — called by EndothelialCell per boundary node
     # ------------------------------------------------------------------
 
-    def get_squeeze_force(self, node, max_perp_distance):
-        """
-        Lateral squeeze force magnitude for a node at position node_y.
+    def apply_forces(self, nodes, positions):
+        if self.t_sf < 1e-10:
+            return
 
-        Returns scalar force in y-direction (signed):
-            positive → push node upward (node is below cable)
-            negative → push node downward (node is above cable)
+        self._apply_axial_forces(nodes)
+        self._apply_lateral_squeeze(nodes, positions)
+    
+    def _apply_axial_forces(self, nodes):
+        force = self.t_sf * self.unit_vec
 
-        Formula:
-            d = node_y - cable_y (signed distance from cable)
-            weight = |d| / max_y_distance (0 at poles, 1 at max flank)
-            F = -nu_sf × a_sf × weight × sign(d)
+        upstream_nodes = [n for n in nodes if n.role == "upstream"]
+        downstream_nodes = [n for n in nodes if n.role == "downstream"]
 
-        node_y: node.pos[1]
-        max_y_distance:  max |node_y - cable_y| across all boundary nodes
-                         computed by EndothelialCell before calling this
-        """
-        if self.a_sf < 1e-6 or max_perp_distance < 1e-10:
-            return 0.0
+        n = len(upstream_nodes)
+
+        if n == 0:
+            return
+        
+        for node in upstream_nodes:
+            node.apply_force(force/n)
+
+        for node in downstream_nodes:
+            node.apply_force(-force/n)
+
+    def _apply_lateral_squeeze(self, nodes, positions):
+        if self.a_sf < 1e-6:
+            return
         
         ux, uy = self.unit_vec
-        perp = np.array([-uy, ux])
+        perp_unit = np.array([-uy, ux])
 
-        perp_dist = np.dot(node.pos - self.cable_mid, perp)
-        weight = abs(perp_dist) / max_perp_distance
+        # Vectorised signed perpendicular distances
+        rel = positions - self.cable_mid
+        distances = rel @ perp_unit
 
-        return -self.nu_sf * self.t_sf * weight * np.sign(perp_dist)
-    
+        max_dist = np.max(np.abs(distances))
+        if max_dist < 1e-10:
+            return
+        
+        weights = distances / max_dist
+        magnitudes = -self.nu_sf * self.t_sf * weights
+
+        # Apply forces
+        for node, mag in zip(nodes, magnitudes):
+            if abs(mag) > 1e-10:
+                node.apply_force(mag * perp_unit)
+
+    # ------------------------------------------------------------------
+    # Update SF Activation
+    # ------------------------------------------------------------------
+    def update_a_sf(self, global_rhoc, rhoc_baseline, dt):
+        if global_rhoc <= rhoc_baseline:
+            target = 0.0
+        else:
+            target = (global_rhoc - rhoc_baseline) / (1.0 - rhoc_baseline)
+
+        alpha = dt / self.mech.get('tau_remodel', 30)
+        self.a_sf += alpha * (target - self.a_sf)
+        self.a_sf = float(np.clip(self.a_sf, 0.0, 1.0))
 
     # ------------------------------------------------------------------
     # Diagnostics
