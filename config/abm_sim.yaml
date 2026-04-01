@@ -184,7 +184,7 @@ mechanics:
     # SWEPT in parameter sweep.
 
   # --- Stress fibre ---
-  k_sf_fraction: 0.69
+  k_sf_fraction: 0.5
     # SF cable stiffness (pN). Tension: t_sf = k_sf × a_sf.
     # No rest length — purely active/contractile.
     # Controls magnitude of inward pull on FA poles.

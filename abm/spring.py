@@ -26,11 +26,9 @@ class Spring:
         self.node_2 = node_2
 
         # Cortical properties
-        mech_cfg = self.cfg['mechanics']
+        self.mech = self.cfg['mechanics']
         self.L_cortex = rest_length
-        self.k_cortex = mech_cfg['k_cortex']
         self.a_cortex = 0.95
-        #self.k_active = k_cortex      # updated each step by EndothelialCell
         self.t_cortex = 0.0
 
         # Geometry
@@ -46,7 +44,6 @@ class Spring:
         """
         Recompute length and alignment from current node positions.
         """
-        mech = self.cfg['mechanics']
     
         diff = self.node_2.pos - self.node_1.pos
         length = np.linalg.norm(diff)
@@ -57,20 +54,14 @@ class Spring:
         self.unit_vec = diff / length
         self.alignment = abs(np.dot(self.unit_vec, flow_direction))
         
-        # Direct RhoA scaling — no delta, no rest point
-        # mean_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
-        # a_cortex = 1.0 + mech['rhoa_k_gain'] * mean_rhoa
-        # self.a_cortex = max(a_cortex, 0.1) # Prevent negative stiffness
-
-        # self.k_active = self.k_cortex * mech['rhoa_k_gain'] * mean_rhoa
-        
-        # kc_effective = mech['kc_ratio']
+        k_cortex = self.mech['k_cortex']
+        kc_ratio = self.mech['kc_ratio']
         
         self.t_cortex = activated_bilinear(
             l_current=self.L_current,
             l_rest=self.L_cortex,
-            k=self.k_cortex,
-            kc_ratio=self.cfg['mechanics']['kc_ratio'],
+            k=k_cortex,
+            kc_ratio=kc_ratio,
             a=self.a_cortex
         ) 
 

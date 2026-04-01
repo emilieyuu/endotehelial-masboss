@@ -40,10 +40,10 @@ class EndothelialCell:
     def __init__(self, cell_id, centroid, lut, cfg,
                  n_nodes=16, radius=12.0, flow_direction=np.array([1.0, 0.0])):
 
-        self.id          = cell_id
-        self.n_nodes     = n_nodes
-        self.cfg         = cfg
-        self.lut         = lut
+        self.id = cell_id
+        self.n_nodes = n_nodes
+        self.cfg = cfg
+        self.lut = lut
 
         # Normalised Flow Direction
         flow = np.asarray(flow_direction, dtype=float)
@@ -348,7 +348,7 @@ class EndothelialCell:
 
         for node in self.nodes:
             if node.id in self.fa_positions:
-                a = self.stress_fibre.get_sf_activation()
+                a = self.stress_fibre.a_sf
                 gamma = gamma_base * (1.0 + k_fa * a)
             else:
                 gamma = gamma_base
@@ -390,7 +390,7 @@ class EndothelialCell:
             # Signalling
             'mean_rhoa': safe_mean([n.P_RhoA for n in self.nodes]),
             'mean_rhoc': safe_mean([n.P_RhoC for n in self.nodes]),
-            'a_sf': round(self.a_sf, 3),
+            'a_sf': round(self.stress_fibre.a_sf, 3),
             # Force distribution
             'sf_tension': forces['sf_tension'],
             'a_cortex_pole': forces['a_cortex_pole'],

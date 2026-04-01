@@ -40,11 +40,8 @@ class StressFibre:
         self.cfg             = cfg
         self.mech = cfg['mechanics']
 
-
         # Stress fibre properties
-        mech = cfg['mechanics']
         self.L_sf = rest_length
-        self.k_sf = self.mech.get('k_sf', 0.5) # cable stiffness, portion of cortex
         self.nu_sf = self.mech.get('nu_sf', 0.3) # Poisson ratio
 
         self.a_sf = 0.0  
@@ -83,18 +80,14 @@ class StressFibre:
         self.unit_vec  = diff / length
         self.cable_mid = 0.5 * (self.node_upstream.pos + self.node_downstream.pos)
 
-        # Compute cable tension from Hooke's Law
-        # self.t_sf = activated_hookes(
-        #     l_current=self.L_current, 
-        #     l_rest=self.L_sf, 
-        #     k=self.k_sf,
-        #     a=self.a_sf, 
-        # )
+        k_sf = self.mech['k_sf_fraction'] * self.mech['k_cortex']
+        kc_ratio = self.mech['k_sf_fraction'] * self.mech['kc_ratio']
+
         self.t_sf = activated_bilinear(
             l_current=self.L_current,
             l_rest=self.L_sf,
-            k=self.k_sf,
-            kc_ratio=self.cfg['mechanics']['kc_ratio']*self.k_sf, 
+            k=k_sf,
+            kc_ratio=kc_ratio, 
             a=self.a_sf
         ) 
 

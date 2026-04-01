@@ -83,15 +83,15 @@ def measure_forces(cell):
     #         max_squeeze = f
 
     # --- FA anchoring ---
-    k_fa_base = cell.cfg['mechanics'].get('k_fa', 2.0)
-    k_fa = k_fa_base * (1.0 + cell.a_sf)
+    # k_fa_base = cell.cfg['mechanics'].get('k_fa', 2.0)
+    # k_fa = k_fa_base * (1.0 + cell.a_sf)
 
-    fa_forces = []
-    for node_id, fa_pos in cell.fa_positions.items():
-        node = cell.nodes[node_id]
-        disp = node.pos - fa_pos
-        axial_disp = np.dot(disp, cell.flow_direction) * cell.flow_direction
-        fa_forces.append(abs(k_fa * axial_disp))
+    # fa_forces = []
+    # for node_id, fa_pos in cell.fa_positions.items():
+    #     node = cell.nodes[node_id]
+    #     disp = node.pos - fa_pos
+    #     axial_disp = np.dot(disp, cell.flow_direction) * cell.flow_direction
+    #     fa_forces.append(abs(k_fa * axial_disp))
 
     # --- Area conservation ---
     area_deficit  = cell.target_area - cell.current_area
@@ -118,7 +118,7 @@ def measure_forces(cell):
         'a_sf':              round(cell.a_sf, 4),
 
         # FA stabilisation
-        'fa_force':          safe_mean(fa_forces),
+     #   'fa_force':          safe_mean(fa_forces),
 
         # Area pressure
         'area_pressure':     round(area_pressure, 4),
