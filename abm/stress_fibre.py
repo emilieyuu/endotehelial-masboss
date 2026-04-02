@@ -28,7 +28,7 @@ class StressFibre:
         self.mech = cfg['mechanics']
 
         # Stress fibre properties
-        self.L_sf = rest_length
+        self.L_sf = rest_length 
         self.a_sf = 0.0  
         self.t_sf = 0.0 # axial cable tension
 
@@ -105,6 +105,7 @@ class StressFibre:
         for node in downstream_nodes:
             node.apply_force(-force/n)
 
+
     def _apply_lateral_squeeze(self, nodes, positions):
         """
         Lateral squeeze force on lateral nodes. 
@@ -135,16 +136,24 @@ class StressFibre:
     # ------------------------------------------------------------------
     def update_activation(self, mean_rhoc, rhoc_rest, dt):
         """
-        
-        """
-        if mean_rhoc <= rhoc_rest:
-            target = 0.0
-        else:
-            target = (mean_rhoc - rhoc_rest) / (1.0 - mean_rhoc)
 
+        """
+        # if mean_rhoc <= rhoc_rest:
+        #     target = 0.0
+        # else:
+        #     target = (mean_rhoc - rhoc_rest) / (1.0 - rhoc_rest)
+        
+        
+        # alpha = dt / self.mech.get('tau_remodel', 30)
+        # self.a_sf += alpha * (target - self.a_sf)
+        # self.a_sf = float(np.clip(self.a_sf, 0.0, 1.0))
+        target = float(np.clip(mean_rhoc, 0.0, 1.0))
+        
         alpha = dt / self.mech.get('tau_remodel', 30)
         self.a_sf += alpha * (target - self.a_sf)
         self.a_sf = float(np.clip(self.a_sf, 0.0, 1.0))
+ 
+
 
     # ------------------------------------------------------------------
     # Diagnostics

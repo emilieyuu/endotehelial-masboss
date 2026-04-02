@@ -16,6 +16,7 @@ class MembraneNode:
         self.f_normal = 0.0 
         self.f_total = 0.0
         self.f_tangential = 0.0
+        self.t_node = 0.0
 
         # Signalling state, computed by update_signalling()
         self.DSP    = 0.0
@@ -23,6 +24,8 @@ class MembraneNode:
         self.JCAD   = 0.0
         self.P_RhoA = 0.0
         self.P_RhoC = 0.0
+
+        self.integrity = 0.0
 
     def update_signalling(self):
         """
@@ -36,12 +39,16 @@ class MembraneNode:
         Output: P_RhoA, P_RhoC stored for reading by Spring and Cell
         """
         tau_dsp  = max(self.f_normal, 0.0)   # tensile component — local
-        tau_tjp1 = self.f_total#np.sqrt(self.f_normal**2 + 0.5 * self.f_tangential**2)
-        tau_jcad = max(self.f_normal, 0.0) #max(self.f_normal, 0.0) # same as DSP 
+        tau_tjp1 = self.cfg['flow']['f_magnitude'] # total shear
+        tau_jcad = max(self.f_normal, 0.0) # same as DSP 
 
         self.DSP  = get_protein_recruitment(self.cfg, tau_dsp, 'DSP')
         self.TJP1 = get_protein_recruitment(self.cfg, tau_tjp1, 'TJP1')
         self.JCAD = get_protein_recruitment(self.cfg, tau_jcad, 'JCAD')
+
+        # Junction integrity scales rhoc activation
+        self.integrity = (self.DSP + self.JCAD + self.TJP1) / 2.0
+        self.integrity = np.clip(self.integrity, 0.0, 1.0)
 
         self.P_RhoA, self.P_RhoC = self.lut.query(
             self.DSP, self.TJP1, self.JCAD
@@ -76,7 +83,7 @@ class MembraneNode:
 
         self.pos += displacement # update node position
         self.force = np.zeros(2) # reset for next time step
-    
+            
     def __repr__(self):
         return (
             f"MembraneNode(id={self.id} | role={self.role} | "

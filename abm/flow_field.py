@@ -16,6 +16,25 @@ class FlowField:
         self.magnitude  = magnitude
         self.direction  = direction / norm
 
+    def get_signalling_forces(self, node_normal):
+        """
+        Calculates tensile and tangential and total components at a point of the membrane. 
+        
+        f_normal: tensile component
+        f_tanegtial: sliding component
+        f_total: weighted magnitude
+            Junction proteins respon more strongly to tensile than tangential loading
+        """
+        cos_theta = np.dot(self.direction, node_normal)
+        f_n = self.magnitude * abs(cos_theta) # tensile magnitude
+        f_t = self.magnitude * np.sqrt(1 - cos_theta**2) # tangential magnitude
+        
+        # Weighted total magnitude
+        tangential_weight = 0.5
+        f_total = np.sqrt(f_n**2 + tangential_weight * f_t**2)
+
+        return f_n, f_t, f_total
+
     def get_force_on_node(self, node):
         return self.direction * self.magnitude
     

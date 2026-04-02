@@ -2,7 +2,7 @@
 
 from abm.mechanics import hill
 
-def get_protein_recruitment(cfg, tau, protein, perturbation='WT'):
+def get_protein_recruitment(cfg, tau, protein):
     """
     Look up Hill parameters for protein and return recruitment probability.
     """

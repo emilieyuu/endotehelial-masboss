@@ -38,7 +38,7 @@ cell_geometry:
 # FLOW — External shear stress input
 # -----------------------------------------------------------------------------
 flow:
-  f_magnitude: 15.0
+  f_magnitude: 20.0
   f_direction: [1.0, 0.0]
   drag_fraction: 0.2
 
@@ -47,19 +47,19 @@ flow:
 # -----------------------------------------------------------------------------
 hill_params:
   DSP:
-    K_divisor: 4  # f_magnitude/4
+    K_divisor: 2  # f_magnitude/4
     n: 3 # moderate cooperativity — tensile junction sensor
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false   # set true for DSP_KO perturbation
 
   TJP1:
-    K_divisor: 6 # f_magnitude/6
+    K_divisor: 5 # f_magnitude/6
     n: 2 # low cooperativity — total shear sensor
     p_max: 0.67 # MaBoSS LUT ceiling — fixed
     knocked_out: false
 
   JCAD:
-    K_divisor: 5
+    K_divisor: 2.5
     n: 4 # high cooperativity — sharp pole amplifier
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false
@@ -70,13 +70,14 @@ hill_params:
 mechanics:
 
   # --- Cortical spring ---
-  k_cortex: 1.0
+  k_cortex: 1.0 # Baseline for all other stiffness
   kc_ratio: 0.1
-  rhoa_k_gain: 5.0
+  rhoa_gain: 4.0
 
   # --- Stress fibre ---
-  k_sf_fraction: 0.5
+  k_sf_fraction: 0.6
   nu_sf: 0.6
+  rhoc_gain: 0.5
 
   # --- SF remodelling ---
   tau_remodel: 30.0

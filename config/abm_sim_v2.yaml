@@ -1,0 +1,253 @@
+# config/abm_sim_v2.yaml
+# EC Elongation ABM — Simulation Config 
+# =============================================================================
+# Single isolated endothelial cell under laminar shear stress.
+# 2D top-down view, overdamped dynamics: dx = (F_net / gamma) × dt
+# =============================================================================
+
+experiment: "abm_simulation"
+
+
+# -----------------------------------------------------------------------------
+# FILES
+# -----------------------------------------------------------------------------
+files:
+  recruitment_csv: "param_sweep_Joint_Recr_Sweep.csv"
+    # MaBoSS lookup table: (DSP, TJP1, JCAD) → (P_RhoA, P_RhoC)
+    # Fixed — generated externally, not modified by ABM
+
+
+# -----------------------------------------------------------------------------
+# INTEGRATION — Numerical solver settings
+# -----------------------------------------------------------------------------
+# Overdamped equation: dx = (F_net / gamma) × dt
+# All forces are in pN, lengths in µm, times in minutes.
+#
+# TIME MAPPING (dt = 0.1 → 6 seconds per step)
+#   300 steps  →  30 min   (63% SF remodelling)
+#   900 steps  →  90 min   (95% SF remodelling)
+#   1500 steps →  150 min  (sweep standard)
+#   5000 steps →  500 min  (steady-state confirmation)
+#   14400 steps → 24 hours (full experimental comparison)
+# -----------------------------------------------------------------------------
+integration:
+  dt: 0.1
+    # Timestep (minutes). 0.1 min = 6 s.
+    # Stability: dt × k_max / gamma must be < max_displacement.
+    # Worst case: k_active ≈ k_cortex × (1 + rhoa_k_gain) ≈ 16 pN/µm
+    #   → dt × k_max / gamma ≈ 0.1 × 16 / 3 ≈ 0.53 µm/step (safe).
+    # Reduce to 0.01 if instability at high rhoa_k_gain.
+
+  gamma: 3.0
+    # Overdamped drag coefficient (pN·min/µm).
+    # Sets mechanical relaxation timescale: tau_mech ~ gamma / k ~ 3 min.
+    # Must be << tau_remodel (30 min) so mechanics equilibrates between
+    # signalling updates. Current ratio ~10×. NOT SWEPT — timescale
+    # separation is a modelling requirement, not a free parameter.
+
+  max_displacement: 0.5
+    # Per-step displacement clamp (µm). Safety valve.
+    # Prevents numerical blow-up if forces spike transiently.
+    # Should be > typical step displacement (~0.1–0.3 µm) but
+    # < spring rest length (~4.7 µm) to avoid topology violations.
+    # NOT SWEPT — purely numerical.
+
+  n_steps: 1500
+    # Default run length. 150 min → 95% SF remodelling.
+    # Override per experiment (500 for quick test, 14400 for full run).
+
+
+# -----------------------------------------------------------------------------
+# CELL GEOMETRY — Initial cell shape and discretisation
+# -----------------------------------------------------------------------------
+cell_geometry:
+  n_nodes: 16
+    # Boundary discretisation.
+    # 16 nodes + cos(30°) threshold → 3 upstream, 3 downstream, 10 lateral.
+    # Minimum for distinct pole/flank signalling populations.
+    # Verified: 32 nodes gives same qualitative result at 2× cost.
+
+  radius: 12.0
+    # Cell semi-minor axis (µm). Diameter ~24 µm.
+    # Typical spread EC: 20–40 µm diameter (sub-confluent).
+    # Sets initial spring rest lengths: L₀ = 2π × radius / n_nodes ≈ 4.7 µm.
+    # Sets initial area: π × radius × (radius × init_ar) ≈ 540 µm² at AR 1.2.
+
+  init_ar: 1.1
+    # Initial aspect ratio (semi-major / semi-minor along flow axis).
+    # Seeds RhoA spatial gradient — poles get more f_normal than flanks.
+    # Biologically: cells are never perfectly circular in vivo.
+    # Must be > 1.0 (breaks symmetry) but close to 1.0 (doesn't predetermine
+    # final shape). 1.2 gives ~10% pole advantage in f_normal. NOT SWEPT.
+
+  polar_threshold: 0.866
+    # cos(30°). Node classification: |projection onto flow| > threshold → pole.
+    # Pure geometry — gives 3 nodes per pole at n_nodes=16.
+    # NOT SWEPT — discretisation choice, not a biological parameter.
+
+
+# -----------------------------------------------------------------------------
+# FLOW — External shear stress input
+# -----------------------------------------------------------------------------
+flow:
+  f_magnitude: 15.0
+    # Shear force magnitude (pN). Applied to all nodes.
+    # Scales all signalling inputs: f_normal ∝ f_magnitude, f_total = f_magnitude.
+    # IMPORTANT: Hill K values must scale with f_magnitude (K = f_magnitude/5
+    # for DSP/JCAD; see hill_params). When sweeping f_magnitude, K must update.
+    # SWEPT in parameter sweep.
+
+  f_direction: [1.0, 0.0]
+    # Flow direction unit vector (+x axis = laminar flow).
+    # Fixed — model assumes unidirectional laminar shear.
+
+  drag_fraction: 0.2
+    # Mechanical drag force as fraction of f_magnitude.
+    # Pole drag = f_magnitude × drag_fraction = 1.5 pN at f_mag=15.
+    # Small directional trigger: pushes upstream/downstream nodes apart.
+    # Without signalling, this alone produces slight elongation.
+    # Biologically: net fluid drag on apical surface is ~5–15% of shear.
+    # SWEPT in parameter sweep.
+
+
+# -----------------------------------------------------------------------------
+# SIGNALLING — Hill function parameters for junction protein recruitment
+# -----------------------------------------------------------------------------
+# Chain: shear → f_normal/f_total → Hill → DSP/TJP1/JCAD → LUT → RhoA/RhoC
+#
+# Hill function: protein = p_max / (1 + (K / input)^n)
+#
+# K derivation:
+#   At poles: f_normal ≈ f_magnitude (normal ≈ parallel to flow)
+#   At flanks: f_normal ≈ 0 (normal ≈ perpendicular to flow)
+#   Want: poles near saturation, flanks in dynamic range
+#   Setting K = f_magnitude / 5 gives:
+#     pole:  Hill ≈ p_max × 0.96  (near-saturated)
+#     flank: Hill drops with cos(angle) — dynamic range preserved
+#
+# p_max = 0.67 for all: set by MaBoSS LUT input range. NOT tuneable.
+#
+# Cooperativity (n):
+#   DSP  n=3: moderate spatial sharpness — tensile sensor
+#   TJP1 n=2: broad response — total shear sensor (uniform input anyway)
+#   JCAD n=4: sharp spatial threshold — amplifier, active only at poles
+#
+# ANALYTICAL VERIFICATION (not swept):
+#   Generate Hill(f_normal(θ)) for θ = 0..2π at each node position.
+#   Confirm: DSP/JCAD show pole-enriched gradient; TJP1 uniform.
+#   Confirm: LUT output gives expected RhoA/RhoC spatial patterns.
+# -----------------------------------------------------------------------------
+hill_params:
+  DSP:
+    K_divisor: 4  # f_magnitude/4
+    n: 3 # moderate cooperativity — tensile junction sensor
+    p_max: 0.67         # MaBoSS LUT ceiling — fixed
+    knocked_out: false   # set true for DSP_KO perturbation
+
+  TJP1:
+    K_divisor: 6 # f_magnitude/6
+    n: 2 # low cooperativity — total shear sensor
+    p_max: 0.67 # MaBoSS LUT ceiling — fixed
+    knocked_out: false
+
+  JCAD:
+    K_divisor: 5
+    n: 4 # high cooperativity — sharp pole amplifier
+    p_max: 0.67         # MaBoSS LUT ceiling — fixed
+    knocked_out: false
+
+
+# -----------------------------------------------------------------------------
+# MECHANICS — Cortical springs, stress fibres, focal adhesions, area penalty
+# -----------------------------------------------------------------------------
+mechanics:
+
+  # --- Cortical spring ---
+  k_cortex: 1.0
+    # Baseline cortical stiffness (pN/µm). Reference unit — all other
+    # stiffnesses are implicitly relative to this.
+    # NOT SWEPT — it's the normalisation scale.
+
+  kc_ratio: 0.1
+    # Compression / tension stiffness ratio.
+    # Actin cortex is ~10× softer in compression (buckles) than tension.
+    # Standard in cortical models (Salbreux et al. 2012).
+    # NOT SWEPT — well-constrained by biophysics.
+
+  rhoa_k_gain: 5.0
+    # RhoA-dependent stiffening gain.
+    # k_active = k_cortex × (1 + rhoa_k_gain × delta_RhoA)
+    # At full RhoA activation (delta_RhoA ≈ 0.12 above rest):
+    #   k_active ≈ 1 × (1 + 15 × 0.12) = 2.8 pN/µm
+    # Controls how much RhoA at poles resists elongation.
+    # Key regulator of TJP1_KO phenotype (high RhoA → stiff → low AR).
+    # SWEPT in parameter sweep.
+
+  # --- Stress fibre ---
+  k_sf_fraction: 0.5
+    # SF cable stiffness (pN). Tension: t_sf = k_sf × a_sf.
+    # No rest length — purely active/contractile.
+    # Controls magnitude of inward pull on FA poles.
+    # SWEPT in parameter sweep.
+
+  nu_sf: 0.6
+    # Poisson squeeze coupling coefficient.
+    # F_squeeze = -nu_sf × a_sf × (d / max_d) × sign(d) ĵ
+    # Converts axial SF tension to lateral compression.
+    # Primary driver of elongation via area conservation.
+    # Biologically: SF contraction narrows cell perpendicular to fibre.
+    # SWEPT in parameter sweep.
+
+  # Maximum reachable delta RhoC for a_sf normalisation
+  delta_rhoc_max: 0.340 
+    # From LUT: max P_RhoC ≈ 0.777, rest = 0.437, delta_max ≈ 0.340.
+
+  # --- SF remodelling ---
+  tau_remodel: 30.0
+    # First-order lag timescale for a_sf (minutes).
+    # a_sf += (dt / tau_remodel) × (a_sf_target - a_sf)
+    # SF assembly in ECs under shear: 15–60 min experimentally
+    # (Noria et al. 2004, Galbraith et al. 1998). 30 min = midpoint.
+    # NOT SWEPT — biologically constrained.
+
+  # --- Focal adhesion ---
+  k_fa: 0.8
+    # FA spring stiffness (pN/µm). Resists displacement from ratchet.
+    # Must be > k_sf so FAs resist SF contraction (otherwise poles
+    # collapse inward). At k_fa=2, k_sf=0.4: FA force dominates.
+    # Biologically: mature FAs are mechanically stiff anchors.
+    # NOT SWEPT — constrained by k_fa > k_sf requirement.
+  #fa_sf_gain: 1.5
+
+  # --- Area conservation ---
+  k_area: 0.5
+    # Area conservation penalty stiffness (pN/µm²).
+    # Pressure = k_area × (target_area - current_area).
+    # Soft constraint — must be weak enough that SF/cortex drive shape,
+    # not pressure. At k_area=0.5 with 10% area deficit (~50 µm²):
+    #   pressure ≈ 25 pN/µm, distributed over 16 nodes ≈ 1.6 pN/node.
+    # Comparable to but not dominant over cortical forces.
+    # NOT SWEPT — tuned for stability, not phenotype.
+
+
+# -----------------------------------------------------------------------------
+# PERTURBATIONS — Knockout conditions
+# -----------------------------------------------------------------------------
+# Each entry overrides hill_params for the named protein.
+# knocked_out: true → protein recruitment fixed at 0 for all nodes.
+# Combinations test epistasis between junction protein pathways.
+# -----------------------------------------------------------------------------
+perturbations:
+  WT: {}
+  DSP_KO:
+    DSP: {knocked_out: true}
+  TJP1_KO:
+    TJP1: {knocked_out: true}
+  JCAD_KO:
+    JCAD: {knocked_out: true}
+  DSP_JCAD_DKO:
+    DSP: {knocked_out: true}
+    JCAD: {knocked_out: true}
+  TJP1_JCAD_DKO:
+    TJP1: {knocked_out: true}
+    JCAD: {knocked_out: true}

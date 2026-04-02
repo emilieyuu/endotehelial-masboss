@@ -17,7 +17,7 @@ class Spring:
 
         # Cortical properties
         self.L_cortex = rest_length # Length at initiation – constant
-        self.a_cortex = 1.0 # RhoA activated tension gain, has basal activation of 1.0
+        self.a_cortex = 0.95 # RhoA activated tension gain, has basal activation of 1.0
         self.t_cortex = 0.0 # Tension (force) of spring
 
         # Geometry
@@ -59,6 +59,8 @@ class Spring:
             k=k_cortex, kc_ratio=kc_ratio, a=self.a_cortex
         ) 
 
+        
+
     # ------------------------------------------------------------------
     # 2. Force application
     # ------------------------------------------------------------------
@@ -92,9 +94,10 @@ class Spring:
         mean_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
 
         # Compute activation directly of RhoA level
-        rhoa_k_gain = self.mech.get('rhoa_k_gain', 5.0)
-        a_cortex = 1.0 + rhoa_k_gain * mean_rhoa
+        rhoa_gain = self.mech.get('rhoa_gain', 4.0) 
+        a_cortex = 1.0 + rhoa_gain * mean_rhoa 
         self.a_cortex = max(a_cortex, 1.0) # Cortex never falls below "baseline stiffness"
+
 
     # ------------------------------------------------------------------
     # Diagnostics
