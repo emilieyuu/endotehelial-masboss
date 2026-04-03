@@ -9,70 +9,51 @@ class MembraneNode:
         self.pos = np.array(position, dtype=float)
         self.force = np.zeros(2)
         self.role = 'lateral'
-        self.lut   = lut
-        self.cfg   = cfg
+        self.lut = lut
+        self.cfg = cfg
 
-        # Shear input, set by EndothelialCell at each step
-        self.f_normal = 0.0 
-        self.f_total = 0.0
-        self.f_tangential = 0.0
-        self.tensile_load = 0.0
+        # Shear Inputs (set by EndothelialCell._apply_shear())
+        self.f_normal = 0.0 # tensile component
+        self.f_total = 0.0 # weighted magnitude for TJP1
 
         # Signalling state, computed by update_signalling()
-        self.DSP    = 0.0
-        self.TJP1   = 0.0
-        self.JCAD   = 0.0
-        self.P_RhoA = 0.0
-        self.P_RhoC = 0.0
-
+        self.DSP, self.TJP1, self.JCAD = 0.0, 0.0, 0.0
+        self.P_RhoA, self.P_RhoC = 0.0,  0.0
 
     def update_signalling(self):
         """
-        Compute junction protein recruitment and Rho activity
-        from local normal shear component.
+        Compute junction protein recruitment local shear components.
 
-        f_normal: tensile shear at this node = tau × |n̂ · ê_x|. 
-        Highest at poles, zero at flanks.
-
-        DSP, TJP1, JCAD: all isotropic for now (no alignment weighting)
-        Output: P_RhoA, P_RhoC stored for reading by Spring and Cell
+        DSP:  tensile loading (f_normal) — pole-enriched
+        TJP1: total shear magnitude (f_total) — near-uniform
+        JCAD: tensile loading (f_normal) — pole-enriched
+        
+        Proteins → LUT → RhoA, RhoC stored for Spring and Cell.
         """
-        total_tension = self.f_normal + self.tensile_load
-        #print(self.id, total_tension)
-        tau_dsp  = max(self.f_normal, 0.0)   # tensile component — local
-        tau_tjp1 = 15 #max(self.f_normal, 0.0) #self.cfg['flow']['f_magnitude']
-        tau_jcad = max(self.f_normal, 0.0) # same as DSP 
+        # Get shear input
+        tau_dsp  = max(self.f_normal, 0.0)  
+        tau_tjp1 = max(self.f_total, 0.0) 
+        tau_jcad = max(self.f_normal, 0.0) 
 
+        # Compute junction protein recruitment
         self.DSP  = get_protein_recruitment(self.cfg, tau_dsp, 'DSP')
         self.TJP1 = get_protein_recruitment(self.cfg, tau_tjp1, 'TJP1')
         self.JCAD = get_protein_recruitment(self.cfg, tau_jcad, 'JCAD')
 
-
-        self.P_RhoA, self.P_RhoC = self.lut.query(
-            self.DSP, self.TJP1, self.JCAD
-        )
-        self.tensile_load = 0.0
+        # Compute RhoA/RhoC activation
+        self.P_RhoA, self.P_RhoC = self.lut.query(self.DSP, self.TJP1, self.JCAD)
 
     def apply_force(self, force):
         """
         Accumulate force contribution to this node.  
         """
         force = np.asarray(force)
-        if not np.all(np.isfinite(force)):
-            raise ValueError(
-                f"Node {self.id} received non-finite force: {force}"
-            )
         self.force += force
 
-    def integrate_step(self, dt: float, gamma: float, max_displacement: float = 1.0):
+    def integrate_step(self, dt, gamma, max_displacement=0.5):
         """
-        Integrate position forward one timestep. 
-
-        dt: mechanical timestep. 
-        gamma: viscous drag coefficient – higher = slower movement. 
-        max_displacement: soft cap on movement per step. 
-            Prevents nodes teleporting if forces spike during exploration. 
-            Should be ≈ 10% of rest length, pass dynamically. 
+        Overdamped integration: dx = (F / gamma) × dt.
+        Displacement clamped to max_displacement for numerical stability.
         """
         displacement = (self.force / gamma) * dt
         d_norm = np.linalg.norm(displacement)
@@ -80,13 +61,14 @@ class MembraneNode:
         if d_norm > max_displacement:
             displacement = displacement / d_norm * max_displacement
 
-        self.pos += displacement # update node position
-        self.force = np.zeros(2) # reset for next time step
+        self.pos += displacement 
+        self.force = np.zeros(2) 
             
     def __repr__(self):
         return (
             f"MembraneNode(id={self.id} | role={self.role} | "
             f"pos={self.pos.round(2)} | "
-            f"f_normal={self.f_normal:.3f} | "
+            f"f_n={self.f_normal:.3f} | f_t={self.f_total:.3f} | "
+            f"DSP={self.DSP:.3f} | TJP1={self.TJP1:.3f}) | JCAD={self.JCAD:.3f}) "
             f"P_RhoA={self.P_RhoA:.3f} P_RhoC={self.P_RhoC:.3f})"
         )

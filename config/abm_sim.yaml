@@ -10,7 +10,6 @@ experiment: "abm_simulation"
 files:
   recruitment_csv: "param_sweep_Joint_Recr_Sweep.csv"
 
-
 # -----------------------------------------------------------------------------
 # INTEGRATION 
 # -----------------------------------------------------------------------------
@@ -39,14 +38,14 @@ cell_geometry:
 flow:
   f_magnitude: 20.0
   f_direction: [1.0, 0.0]
-  drag_fraction: 0.1
+  drag_fraction: 0.1 # sweep
 
 # -----------------------------------------------------------------------------
 # SIGNALLING — Hill function parameters for junction protein recruitment
 # -----------------------------------------------------------------------------
 hill_params:
   DSP:
-    K_divisor: 2  # f_magnitude/4
+    K_divisor: 1.4  # f_magnitude/4
     n: 3 # moderate cooperativity — tensile junction sensor
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false   # set true for DSP_KO perturbation
@@ -68,23 +67,18 @@ hill_params:
 # MECHANICS — Cortical springs, stress fibres, focal adhesions, area penalty
 # -----------------------------------------------------------------------------
 mechanics:
-
   # --- Cortical spring ---
   k_cortex: 1.0 # Baseline for all other stiffness
   kc_ratio: 0.1
-  rhoa_gain: 10.0
-  rhoa_base: 0.2
+  rhoa_gain: 10.0 # sweep
 
   # --- Stress fibre ---
-  k_sf_fraction: 0.7
-  nu_sf: 0.6
-  rhoa_base: 0.3
+  k_sf_fraction: 0.7 #sweep
+  nu_sf: 0.6 #sweep
+  rhoc_gain: 1.0
 
   # --- remodelling ---
   tau_remodel: 30.0
-
-  # --- Focal adhesion ---
-  k_fa: 0.8
 
   # --- Area conservation ---
   k_area: 0.5

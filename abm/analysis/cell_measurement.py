@@ -52,13 +52,11 @@ def measure_forces(cell):
     pole_fn = safe_mean([n.f_normal for n in pole_nodes])
     lat_fn  = safe_mean([n.f_normal for n in lat_nodes])
 
-    total_ft = safe_mean([n.f_tangential for n in cell.nodes])
-
     # --- Cortical tension ---
     pole_tension   = safe_mean([s.t_cortex for s in pole_springs])
     lat_tension    = safe_mean([s.t_cortex for s in lat_springs])
-    a_cortex_pole = safe_mean([s.a_cortex for s in pole_springs])
-    a_cortex_lat  = safe_mean([s.a_cortex for s in lat_springs])
+    k_active_pole = safe_mean([s.k_active for s in pole_springs])
+    k_active_lat  = safe_mean([s.k_active for s in lat_springs])
 
     # --- Stress fibre ---
     sf_tension = safe_mean(cell.stress_fibre.t_sf)
@@ -77,19 +75,17 @@ def measure_forces(cell):
         'shear_fn_pole':     round(pole_fn, 3),
         'shear_fn_lat':      round(lat_fn, 3),
         'shear_fn_diff':     round(pole_fn - lat_fn, 3),
-        'shear_tangential':  total_ft,
 
         # Cortex resistance
         'cortex_T_pole':     round(pole_tension, 4),
         'cortex_T_lat':      round(lat_tension, 4),
-        'a_cortex_pole':     round(a_cortex_pole, 4),
-        'a_cortex_lat':      round(a_cortex_lat, 4),
+        'k_active_pole':     round(k_active_pole, 4),
+        'k_active_lat':      round(k_active_lat, 4),
 
         # SF elongation drive
         'sf_tension':        round(sf_tension, 4),
         'sf_node_max':       round(sf_node_max, 4),
        # 'sf_squeeze_max':    round(max_squeeze, 4),
-        'a_sf':              round(cell.a_sf, 4),
 
         # FA stabilisation
      #   'fa_force':          safe_mean(fa_forces),
