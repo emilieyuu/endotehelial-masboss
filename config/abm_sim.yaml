@@ -11,7 +11,6 @@ files:
   recruitment_csv: "param_sweep_Joint_Recr_Sweep.csv"
 
 
-
 # -----------------------------------------------------------------------------
 # INTEGRATION 
 # -----------------------------------------------------------------------------
@@ -30,7 +29,7 @@ integration:
 cell_geometry:
   n_nodes: 16
   radius: 12.0
-  init_ar: 1.1
+  init_ar: 1.2
   polar_threshold: 0.866
 
 
@@ -40,7 +39,7 @@ cell_geometry:
 flow:
   f_magnitude: 20.0
   f_direction: [1.0, 0.0]
-  drag_fraction: 0.2
+  drag_fraction: 0.1
 
 # -----------------------------------------------------------------------------
 # SIGNALLING — Hill function parameters for junction protein recruitment
@@ -59,10 +58,11 @@ hill_params:
     knocked_out: false
 
   JCAD:
-    K_divisor: 2.5
+    K_divisor: 3
     n: 4 # high cooperativity — sharp pole amplifier
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false
+
 
 # -----------------------------------------------------------------------------
 # MECHANICS — Cortical springs, stress fibres, focal adhesions, area penalty
@@ -72,14 +72,15 @@ mechanics:
   # --- Cortical spring ---
   k_cortex: 1.0 # Baseline for all other stiffness
   kc_ratio: 0.1
-  rhoa_gain: 4.0
+  rhoa_gain: 10.0
+  rhoa_base: 0.2
 
   # --- Stress fibre ---
-  k_sf_fraction: 0.6
+  k_sf_fraction: 0.7
   nu_sf: 0.6
-  rhoc_gain: 0.5
+  rhoa_base: 0.3
 
-  # --- SF remodelling ---
+  # --- remodelling ---
   tau_remodel: 30.0
 
   # --- Focal adhesion ---

@@ -66,32 +66,6 @@ def measure_forces(cell):
     # Peak nodal force from distributed application (50% to centre)
     sf_node_max = sf_tension * 0.5
 
-    # Max squeeze magnitude across all lateral nodes
-    # max_squeeze = 0.0
-    # sf = cell.stress_fibre
-    # if sf.t_sf < 1e-6:
-    #     continue
-    # ux, uy = sf.unit_vec
-    # perp = np.array([-uy, ux])
-    # max_d = max(abs(np.dot(n.pos - sf.cable_mid, perp)) for n in cell.nodes)
-    # if max_d < 1e-10:
-    #     continue
-
-    # for n in lat_nodes:
-    #     f = abs(sf.get_squeeze_force(n, max_d))
-    #     if f > max_squeeze:
-    #         max_squeeze = f
-
-    # --- FA anchoring ---
-    # k_fa_base = cell.cfg['mechanics'].get('k_fa', 2.0)
-    # k_fa = k_fa_base * (1.0 + cell.a_sf)
-
-    # fa_forces = []
-    # for node_id, fa_pos in cell.fa_positions.items():
-    #     node = cell.nodes[node_id]
-    #     disp = node.pos - fa_pos
-    #     axial_disp = np.dot(disp, cell.flow_direction) * cell.flow_direction
-    #     fa_forces.append(abs(k_fa * axial_disp))
 
     # --- Area conservation ---
     area_deficit  = cell.target_area - cell.current_area

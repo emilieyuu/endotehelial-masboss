@@ -1,24 +1,31 @@
 # abm/spring.py
 
 import numpy as np
-from abm.mechanics import activated_bilinear
+from abm.mechanics import activated_bilinear, bilinear_tension
+from abm.signalling import hill
 
 class Spring:
     """
     Cortical junction between two adjacent membrane nodes.
+
+    Purely mechanical, no signalling.
+    Stiffness derived from RhoA at endpoint nodes. 
+    k_active = k_cortex * (1 + rhoa_k_gain * eff_rhoa)
     """
 
     def __init__(self, spring_id, node_1, node_2,
-                 rest_length, side, cfg):
+                 rest_length, side, cfg, lut):
 
         self.id = spring_id
         self.node_1, self.node_2 = node_1, node_2
+        self.lut = lut
         self.mech = cfg['mechanics']
 
         # Cortical properties
-        self.L_cortex = rest_length # Length at initiation – constant
-        self.a_cortex = 0.95 # RhoA activated tension gain, has basal activation of 1.0
+        self.L_cortex = rest_length  # Length at initiation – constant
+        self.a_cortex = 1.0 # RhoA activated tension gain, has basal activation of 1.0
         self.t_cortex = 0.0 # Tension (force) of spring
+        self.k_active = 1.0
 
         # Geometry
         self.L_current = rest_length # Current (activated length)
@@ -54,12 +61,16 @@ class Spring:
         kc_ratio = self.mech['kc_ratio']
         
         # Calculate tension using activated bilinear law
-        self.t_cortex = activated_bilinear(
+        # self.t_cortex = activated_bilinear(
+        #     l_current=self.L_current, l_rest=self.L_cortex,
+        #     k=k_cortex, kc_ratio=kc_ratio, a=self.a_cortex
+        # ) 
+        self.t_cortex = bilinear_tension(
             l_current=self.L_current, l_rest=self.L_cortex,
-            k=k_cortex, kc_ratio=kc_ratio, a=self.a_cortex
-        ) 
-
+            k_tensile=self.k_active, kc_ratio=kc_ratio) 
         
+        self.node_1.tensile_load += self.t_cortex
+        self.node_1.tensile_load += self.t_cortex
 
     # ------------------------------------------------------------------
     # 2. Force application
@@ -92,11 +103,13 @@ class Spring:
         """
         # Compute mean RhoA of connecting nodes
         mean_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
+        rhoa_rest = self.lut.rhoa_rest
+        rhoa_base = 0.2
+        delta_rhoa = max(mean_rhoa - rhoa_base, 0.0) 
 
         # Compute activation directly of RhoA level
         rhoa_gain = self.mech.get('rhoa_gain', 4.0) 
-        a_cortex = 1.0 + rhoa_gain * mean_rhoa 
-        self.a_cortex = max(a_cortex, 1.0) # Cortex never falls below "baseline stiffness"
+        self.k_active = 1.0 * (1.0 + rhoa_gain * delta_rhoa)
 
 
     # ------------------------------------------------------------------
@@ -108,7 +121,8 @@ class Spring:
             'side': self.side,
             'L': round(self.L_current, 4),
             'L0': round(self.L_cortex, 4),
-            'activation': round(self.a_cortex, 4),
+            'stiffness': round(self.k_active, 4),
+           # 'activation': round(self.a_cortex, 4),
             'tension': round(self.t_cortex, 4),
             'alignment': round(self.alignment, 3)
         }

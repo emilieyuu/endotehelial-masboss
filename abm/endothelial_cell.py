@@ -129,7 +129,7 @@ class EndothelialCell:
                 side = 'flank'
 
             s = Spring(spring_id=i, node_1=n1, node_2=n2,
-                        rest_length=dist, side=side, cfg=cfg)
+                        rest_length=dist, side=side, cfg=cfg, lut=self.lut)
 
             springs.append(s)
 
@@ -176,10 +176,6 @@ class EndothelialCell:
     @property 
     def rhoc_mean(self):
         return float(np.mean([n.P_RhoC for n in self.nodes]))
-    
-    @property 
-    def integrity_mean(self):
-        return float(np.mean([n.integrity for n in self.nodes if n.role in ('upstream', 'downstream')]))
 
     # ------------------------------------------------------------------
     # Geometry
@@ -233,7 +229,6 @@ class EndothelialCell:
     # ------------------------------------------------------------------
     # Force methods
     # ------------------------------------------------------------------
-    
     def _apply_shear(self, flow_field):
         """
         Apply shear force to all nodes and set f_normal for signalling.
@@ -241,6 +236,9 @@ class EndothelialCell:
         f_magnitude = flow_field.magnitude
         drag_fraction = self.cfg['flow'].get('drag_fraction', 0.2)
         drag = f_magnitude * drag_fraction
+
+        x_coords = [n.pos[0] for n in self.nodes]
+        x_center = np.mean(x_coords)
 
         for i, node in enumerate(self.nodes):
             normal = self._compute_node_normal(i)
@@ -253,11 +251,16 @@ class EndothelialCell:
             node.f_tangential = ft
             node.f_total = f_total
 
-            # Mechanical drag — opposing forces at poles only
-            if node.role == 'downstream':
-                node.apply_force(self.flow_direction * drag)
-            elif node.role == 'upstream':
-                node.apply_force(-self.flow_direction * drag)
+            if node.role in ('upstream', 'downstream'):
+                f_mag = abs(fn) * drag_fraction
+                f_axial = np.array([f_mag * np.sign(node.pos[0] - x_center), 0.0])
+                node.apply_force(f_axial)
+        
+            # # #Mechanical drag — opposing forces at poles only
+            # if node.role == 'downstream':
+            #     node.apply_force(self.flow_direction * drag)
+            # elif node.role == 'upstream':
+            #     node.apply_force(-self.flow_direction * drag)
 
     def _apply_pressure(self):
         """
@@ -288,6 +291,7 @@ class EndothelialCell:
             dL = 0.5 * (np.linalg.norm(node.pos - prev) + np.linalg.norm(nxt  - node.pos))
             normal = self._compute_node_normal(i)
             node.apply_force(pressure * dL * -normal)
+
 
     # ------------------------------------------------------------------
     # Timestep
@@ -338,7 +342,7 @@ class EndothelialCell:
             else:
                 gamma = gamma_base
 
-            node.integrate_step(dt, gamma, max_disp)
+            node.integrate_step(dt, gamma_base, max_disp)
         
         # -- Signalling and remodelling --
 
@@ -372,13 +376,13 @@ class EndothelialCell:
             'orientation': shape['orientation'],
             'area_ratio': shape['area_ratio'],
             # Signalling
-            'mean_rhoa': safe_mean([n.P_RhoA for n in self.nodes]),
+            'pole_mean_rhoa': safe_mean([n.P_RhoA for n in self.nodes if n.role in ('upstream', 'downstream')]),
+            'lat_mean_rhoa': safe_mean([n.P_RhoA for n in self.nodes if n.role == 'lateral']),
             'mean_rhoc': safe_mean([n.P_RhoC for n in self.nodes]),
             'a_sf': round(self.stress_fibre.a_sf, 3),
             # Force distribution
             'sf_tension': forces['sf_tension'],
             'a_cortex_pole': forces['a_cortex_pole'],
-            'mean_integrity': self.integrity_mean,
         }
     
     def get_diagnostics(self):

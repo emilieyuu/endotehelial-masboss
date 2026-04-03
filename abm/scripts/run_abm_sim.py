@@ -27,20 +27,20 @@ def get_perb_cfg(cfg_base, knockouts):
 
     return cfg
 
-# def get_spring_states(cell, exp_dict) -> list:
-#     """
-#     Return state of all springs as a list of dicts.
-#     Suitable for building a DataFrame across conditions and timesteps.
+def get_spring_states(cell, exp_dict) -> list:
+    """
+    Return state of all springs as a list of dicts.
+    Suitable for building a DataFrame across conditions and timesteps.
 
-#     condition: optional label (e.g. 'WT', 'DSP-KO')
-#     step:      optional step number
-#     time:  optional time in minutes
-#     """
-#     rows = []
-#     for s in cell.springs:
-#         state = s.get_state()
-#         rows.append({**exp_dict, **state})
-#     return pd.DataFrame(rows)
+    condition: optional label (e.g. 'WT', 'DSP-KO')
+    step:      optional step number
+    time:  optional time in minutes
+    """
+    rows = []
+    for s in cell.springs:
+        state = s.get_state()
+        rows.append({**exp_dict, **state})
+    return pd.DataFrame(rows)
 
 def plot_cell(cell, title=''):
     """
@@ -95,10 +95,10 @@ def run_abm_sim_single(cfg, lut, n_steps, perturbation = 'WT', plot=False):
     )
 
 
-
     # Initiate lists to store results
     cell_rows = []
     diagnostic_rows = []
+    spring_dfs = []
 
     # Time loop
     for step in range(n_steps):
@@ -112,9 +112,13 @@ def run_abm_sim_single(cfg, lut, n_steps, perturbation = 'WT', plot=False):
 
             cell_rows.append({**exp_dict, **state})
             diagnostic_rows.append({**exp_dict, **diags})
+            spring_dfs.append(get_spring_states(cell, exp_dict))
 
     cell_df = pd.DataFrame(cell_rows)
     diags_df = pd.DataFrame(diagnostic_rows)
+    spring_df = pd.concat(spring_dfs, ignore_index= True)
+    sf_state = cell.stress_fibre.get_state()
+    print(sf_state)
     # Optionally plot cell at initiation
     if plot:
         plot_cell(cell)
@@ -122,9 +126,12 @@ def run_abm_sim_single(cfg, lut, n_steps, perturbation = 'WT', plot=False):
     return {
         'perb': perturbation,
         'cell_df': cell_df,
+        'spring_df': spring_df,
         'diagnostics': diags_df,
         'cell_final': cell.get_state(),
         'diagnostics_final': cell.get_diagnostics(),
+        'springs_final': get_spring_states(cell, {}),
+       'sf_final': cell.stress_fibre.get_state(),
         'cell': cell
     }
 
@@ -162,8 +169,7 @@ def run_abm_sim(cfg, lut, n_steps=None, result_dir=None, plot=False):
         diag_rows.append({'perturbation': name, **result['diagnostics_final']})
 
         print(f"{name:<18} {result['cell_final']['ar']:>6.3f} {result['cell_final']['orientation']:>8.1f}° "
-                f"{result['cell_final']['a_sf']:>6.3f} {result['cell_final']['mean_rhoa']:>6.3f} "
-                f"{result['cell_final']['mean_rhoc']:>6.3f}")
+                f"{result['cell_final']['a_sf']:>6.3f} ")
 
    # print(f">>> INFO: All perturbations completed successfully.")
 

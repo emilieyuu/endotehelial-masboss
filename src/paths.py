@@ -26,4 +26,4 @@ ABM_SWEEP_RES_DIR = RESULTS_DIR / "abm_sweep"
 HILL_RES_DIR = RESULTS_DIR / "analyse_hill"
 
 # Russ Experimental Data
-EXP_DIR = PROJECT_ROOT / "CSV_Files" / "Elongation"
+EXP_DIR = PROJECT_ROOT / "russ_results" / "Elongation"
