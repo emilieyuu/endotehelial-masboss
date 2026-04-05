@@ -71,16 +71,16 @@ class Spring:
     # ------------------------------------------------------------------
     # 3. Update Cortex Stiffness (after signalling)
     # ------------------------------------------------------------------
-    def update_cortex_stiffness(self):
+    def update_cortex_stiffness(self, mean_rhoa):
         """
         Updates cortex stiffness from local RhoA.
         """
         # Compute mean RhoA of connecting nodes
-        mean_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
+        local_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
    
         # Compute activation directly of RhoA level
         rhoa_gain = self.mech.get('rhoa_gain', 4.0) 
-        rhoa_signal = rhoa_gain * max(mean_rhoa, 0.0) 
+        rhoa_signal = rhoa_gain * max(local_rhoa, 0.0) 
 
         # Instant stiffness update (operates on seconds timescale)
         self.k_active = self.k_cortex + rhoa_signal # k_cortex as stiffness baseline

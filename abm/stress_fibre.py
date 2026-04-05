@@ -65,15 +65,38 @@ class StressFibre:
     # ------------------------------------------------------------------
 
     def apply_sf_forces(self, nodes, positions):
-        """
-        Apply axial contraction and lateral squeeze.
-        Borh scale with t_sf. 
-        """
-        if self.a_sf < 1e-6:
+        """Unified internal SF forces: Axial contraction and Gaussian squeeze."""
+        if self.t_sf < 1e-6:
             return
+        
+        centroid = np.mean([n.pos for n in nodes], axis=0)
+        x_coords = [n.pos[0] for n in nodes]
+        max_dx = (np.max(x_coords) - np.min(x_coords)) / 2
+        
+        nu_sf = self.mech.get('nu_sf', 1.2)
+        sigma = self.L_current * 0.20 # Tight squeeze for the waist
 
-        self._apply_axial_forces(nodes)
-        self._apply_lateral_squeeze(nodes, positions)
+        for node in nodes:
+            dx_vec = node.pos - centroid
+            dx_mag = np.dot(dx_vec, self.unit_vec) # Projection on SF axis
+            #print(f"({node.id}), dx_mag {dx_mag}")
+            
+            # 1. AXIAL INTERNAL PULL (Poles Only)
+            if node.role in ('upstream', 'downstream'):
+                weight_axial = (abs(dx_mag) / max_dx)**2
+                # Pull INWARD toward centroid
+                f_axial = -np.sign(dx_mag) * self.t_sf * weight_axial * self.unit_vec
+                #print(f"({node.id}), axial force {f_axial}")
+                node.apply_force(f_axial)
+
+            # 2. LATERAL GAUSSIAN SQUEEZE (All nodes)
+            weight_sq = np.exp(-(dx_mag**2) / (2 * sigma**2))
+            side_sign = np.sign(np.dot(dx_vec, self.perp_unit))
+            f_sq = -nu_sf * self.t_sf * weight_sq * side_sign * self.perp_unit
+            #print(f"({node.id}), squeeze force {f_sq}")
+            node.apply_force(f_sq)
+
+            # Implement hydraulic_gain instead of area conservation??
     
     def _apply_axial_forces(self, nodes):
         """
@@ -96,25 +119,29 @@ class StressFibre:
 
     def _apply_lateral_squeeze(self, nodes, positions):
         """
-        Lateral squeeze perpendicular to SF axis (Poisson coupling)
-        Force proportional to t_sf, weighted by perpendicular distance.
-        Maximum at flanks, zero on the SF axis.
+        Gaussian squeeze to prevent buckling.
+        Focuses the 'pinch' on the middle of the cell length.
         """
-        rel = positions - self.cable_mid
-        distances = rel @ self.perp_unit
+        centroid = np.mean([n.pos for n in nodes], axis=0)
+        x_coords = [n.pos[0] for n in nodes]
+        cell_length = np.max(x_coords) - np.min(x_coords)
         
-        max_dist = np.max(np.abs(distances))
-        if max_dist < 1e-10:
-            return
+        # Sigma controls the 'width' of the squeeze zone (20% of cell length)
+        sigma = cell_length * 0.2 
+        nu_sf = self.mech.get('nu_sf', 0.8) # Higher nu_sf = more 'pop'
+
+        for node in nodes:
+            dx = node.pos[0] - centroid[0]
+            # Gaussian weight: 1.0 at center (x=0), drops off toward poles
+            weight = np.exp(-(dx**2) / (2 * sigma**2))
+            
+            # Determine if node is top or bottom half to set squeeze direction
+            dy_sign = np.sign(node.pos[1] - centroid[1])
+            f_squeeze = -nu_sf * self.t_sf * weight * dy_sign
+            
+            # Apply strictly in the Y-axis (Perpendicular to flow)
+            node.apply_force(np.array([0.0, f_squeeze]))
         
-        nu_sf = self.mech.get('nu_sf', 0.6)
-        weights = distances / max_dist
-        forces = -nu_sf * self.t_sf * weights
-
-        for node, force in zip(nodes, forces):
-            if abs(force) > 1e-10:
-                node.apply_force(force * self.perp_unit)
-
     # ------------------------------------------------------------------
     # 3. Update Activation
     # ------------------------------------------------------------------

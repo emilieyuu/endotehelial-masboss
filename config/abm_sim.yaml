@@ -36,29 +36,29 @@ cell_geometry:
 # FLOW — External shear stress input
 # -----------------------------------------------------------------------------
 flow:
-  f_magnitude: 20.0
+  f_magnitude: 10.0
   f_direction: [1.0, 0.0]
-  drag_fraction: 0.1 # sweep
+  drag_fraction: 0.2 # sweep
 
 # -----------------------------------------------------------------------------
 # SIGNALLING — Hill function parameters for junction protein recruitment
 # -----------------------------------------------------------------------------
 hill_params:
   DSP:
-    K_divisor: 1.4  # f_magnitude/4
-    n: 3 # moderate cooperativity — tensile junction sensor
+    K_mult: 1.2 #1.4  # f_magnitude/4
+    n: 4 # moderate cooperativity — tensile junction sensor
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false   # set true for DSP_KO perturbation
 
   TJP1:
-    K_divisor: 5 # f_magnitude/6
+    K_mult: 0.6 #5 # f_magnitude/6
     n: 2 # low cooperativity — total shear sensor
     p_max: 0.67 # MaBoSS LUT ceiling — fixed
     knocked_out: false
 
   JCAD:
-    K_divisor: 3
-    n: 4 # high cooperativity — sharp pole amplifier
+    K_mult: 0.4 #3
+    n: 2 # high cooperativity — sharp pole amplifier
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false
 
@@ -70,18 +70,18 @@ mechanics:
   # --- Cortical spring ---
   k_cortex: 1.0 # Baseline for all other stiffness
   kc_ratio: 0.1
-  rhoa_gain: 10.0 # sweep
+  rhoa_gain: 5.0 # sweep
 
   # --- Stress fibre ---
   k_sf_fraction: 0.7 #sweep
-  nu_sf: 0.6 #sweep
+  nu_sf: 0.4 #sweep
   rhoc_gain: 1.0
 
   # --- remodelling ---
   tau_remodel: 30.0
 
   # --- Area conservation ---
-  k_area: 0.5
+  k_area: 1.0
 
 # -----------------------------------------------------------------------------
 # PERTURBATIONS — Knockout conditions

@@ -15,6 +15,8 @@ class MembraneNode:
         # Shear Inputs (set by EndothelialCell._apply_shear())
         self.f_normal = 0.0 # tensile component
         self.f_total = 0.0 # weighted magnitude for TJP1
+        self.f_normal_load = 0.0
+        self.f_total_load = 0.0
 
         # Signalling state, computed by update_signalling()
         self.DSP, self.TJP1, self.JCAD = 0.0, 0.0, 0.0
@@ -31,9 +33,9 @@ class MembraneNode:
         Proteins → LUT → RhoA, RhoC stored for Spring and Cell.
         """
         # Get shear input
-        tau_dsp  = max(self.f_normal, 0.0)  
-        tau_tjp1 = max(self.f_total, 0.0) 
-        tau_jcad = max(self.f_normal, 0.0) 
+        tau_dsp  = max(self.f_normal_load, 0.0)  
+        tau_tjp1 = max(self.f_total_load, 0.0) 
+        tau_jcad = max(self.f_total_load, 0.0) 
 
         # Compute junction protein recruitment
         self.DSP  = get_protein_recruitment(self.cfg, tau_dsp, 'DSP')

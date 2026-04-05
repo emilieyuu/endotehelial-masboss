@@ -19,7 +19,7 @@ def get_protein_recruitment(cfg, tau, protein):
         return 0.0 # No recruitment if protein is knocked out.
 
     f_mag = cfg['flow']['f_magnitude']
-    K = f_mag / params['K_divisor']
+    K = f_mag * params['K_mult']
 
     p_raw = hill(tau, K, params['n'])
     p_max = params.get('p_max', 1.0) 

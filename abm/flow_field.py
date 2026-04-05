@@ -33,7 +33,7 @@ class FlowField:
         tangential_weight = 0.5
         f_total = np.sqrt(f_n**2 + tangential_weight * f_t**2)
 
-        return f_n, f_t, f_total
+        return f_n
 
     def get_force_on_node(self, node):
         return self.direction * self.magnitude
