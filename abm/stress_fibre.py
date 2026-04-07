@@ -11,7 +11,7 @@
 
 import numpy as np
 from abm.mechanics import hookes_law
-from abm.geometry import perpendicular, project_onto_axis
+from abm.geometry import perpendicular, project_onto_axis, axial_projection
 
 class StressFibre:
     """
@@ -27,7 +27,9 @@ class StressFibre:
         self.L_sf = rest_length 
         self.a_sf = 0.0 
         self.t_sf = 0.0 # axial cable tension
-        self.nu_sf = cfg['mechanics']['nu_sf']
+        self.nu_sf = self.mech.get('nu_sf', 0.3)
+        self.contract_frac = self.mech.get('sf_contract_fraction', 0.1)
+        self.k_sf = self.mech.get('k_sf_fraction', 0.7) * self.mech.get('k_cortex', 1.0)
 
         # Geometry 
         self.L_current = 0.0
@@ -59,9 +61,8 @@ class StressFibre:
         self.cable_mid = 0.5 * (self.node_up.pos + self.node_down.pos)
 
         # --- Tension ---
-        k_sf = self.mech.get('k_sf_fraction', 0.5) * self.mech.get('k_cortex', 1.0)
         self.t_sf = hookes_law(l=self.L_current, l0=self.L_sf, 
-                               k=k_sf) * self.a_sf
+                               k=self.k_sf) * self.a_sf
         
     # ------------------------------------------------------------------
     # 2. Load Accumulation
@@ -70,15 +71,12 @@ class StressFibre:
         """
         Accumulate SF axial tension for junction loading. 
         """
+        radius = self.L_current / 2
 
-        mid_point = self.cable_mid
-        radials = [n.pos - mid_point for n in polar_nodes]
-        projections = project_onto_axis(radials, self.axis_unit)
-        max_proj = max(abs(p) for p in projections) + 1e-8
-
-        for node, proj_mag in zip(polar_nodes, projections):
-            weight_axial = (abs(proj_mag) / max_proj)**2
-            load = max(weight_axial * self.t_sf, 0.0)
+        for node in polar_nodes: 
+            projection = axial_projection(node.pos, self.cable_mid, self.axis_unit, radius)
+            weight = projection**2
+            load = max(weight * self.t_sf, 0.0)
             node.tensile_load += load
 
     # ------------------------------------------------------------------
@@ -90,34 +88,49 @@ class StressFibre:
         if self.t_sf < 1e-6:
             return
         
-        # Calculate half-length of the cell for normalization
-        x_coords = [n.pos[0] for n in nodes]
-        max_dx = (np.max(x_coords) - np.min(x_coords)) / 2
+        radius = self.L_current / 2
+
+        for node in nodes: 
+            proj = axial_projection(node.pos, self.cable_mid, self.axis_unit, radius)
+
+            # Axial Contraction
+            f_axial_mag = (proj**2) * self.t_sf * self.contract_frac
+            node.apply_force(-np.sign(proj) * f_axial_mag * self.axis_unit)
+
+            # squeeze
+            dx_vec = node.pos - self.cable_mid    
+            side_sign = np.sign(np.dot(dx_vec, self.perp_unit))        
+            f_sq_mag = (1-proj**2) * self.t_sf * self.nu_sf
+            node.apply_force(-side_sign * f_sq_mag * self.perp_unit)
         
-        nu_sf = self.mech.get('nu_sf', 0.3) # Scaled squeeze ratio
+        # # Calculate half-length of the cell for normalization
+        # x_coords = [n.pos[0] for n in nodes]
+        # max_dx = (np.max(x_coords) - np.min(x_coords)) / 2
+        
+        # nu_sf = self.mech.get('nu_sf', 0.3) # Scaled squeeze ratio
 
-        for node in nodes:
-            # Distance from center projected onto SF axis
-            dx_vec = node.pos - self.cable_mid
-            dx_mag = np.dot(dx_vec, self.axis_unit) 
+        # for node in nodes:
+        #     # Distance from center projected onto SF axis
+        #     dx_vec = node.pos - self.cable_mid
+        #     dx_mag = np.dot(dx_vec, self.axis_unit) 
             
-            # Normalize distance (0 at center, 1 at poles)
-            dist_norm = min(abs(dx_mag) / max_dx, 1.0)
+        #     # Normalize distance (0 at center, 1 at poles)
+        #     dist_norm = min(abs(dx_mag) / max_dx, 1.0)
 
-            # AXIAL PULL
-            weight_axial = dist_norm**2 
-            f_axial = -np.sign(dx_mag) * self.t_sf * weight_axial * 0.1 # 0.1 contraction fraction
-            node.apply_force(f_axial * self.axis_unit)
+        #     # AXIAL PULL
+        #     # weight_axial = dist_norm**2 
+        #     # f_axial = -np.sign(dx_mag) * self.t_sf * weight_axial * 0.1 # 0.1 contraction fraction
+        #     # node.apply_force(f_axial * self.axis_unit)
 
-            # LATERAL SQUEEZE
-            weight_sq = 1 - (dist_norm**2)
+        #     # LATERAL SQUEEZE
+        #     # weight_sq = 1 - (dist_norm**2)
             
-            # Calculate which side of the SF the node is on
-            side_sign = np.sign(np.dot(dx_vec, self.perp_unit))
+            # # Calculate which side of the SF the node is on
+            # side_sign = np.sign(np.dot(dx_vec, self.perp_unit))
             
-            # Apply inward force
-            f_sq = -nu_sf * self.t_sf * side_sign * weight_sq * self.perp_unit
-            node.apply_force(f_sq)
+            # # Apply inward force
+            # f_sq = -nu_sf * self.t_sf * side_sign * weight_sq * self.perp_unit
+            # node.apply_force(f_sq)
 
     # ------------------------------------------------------------------
     # 3. Update Activation

@@ -46,7 +46,7 @@ flow:
 hill_params:
   DSP:
     K: 12 #
-    n: 2 # 
+    n: 3 # 
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false   # set true for DSP_KO perturbation
 
@@ -73,10 +73,10 @@ mechanics:
   rhoa_gain: 5.0 # sweep
 
   # --- Stress fibre ---
-  k_sf_fraction: 0.7 #sweep
-  nu_sf: 0.3 #sweep
-  sf_sigma_fraction: 0.2
-  rhoc_gain: 1.0
+  k_sf_fraction: 0.7 # Jakob
+  nu_sf: 0.3 # Deshpade
+  sf_contract_fraction: 0.1
+  rhoc_gain: 1.0 # sweep
 
   # --- remodelling ---
   tau_remodel: 30.0

@@ -15,7 +15,7 @@ from abm.membrane_node import MembraneNode
 from abm.spring import Spring
 from abm.stress_fibre import StressFibre
 from abm.analysis.cell_measurement import measure_forces, measure_shape
-from abm.geometry import project_onto_axis
+from abm.geometry import project_onto_axis, axial_projection
 from src.utils import safe_mean
 
 class EndothelialCell:
@@ -30,6 +30,7 @@ class EndothelialCell:
         flow_direction = np.asarray(flow_direction, dtype=float)
         self.flow_direction = flow_direction 
         self.flow_axis = flow_direction / np.linalg.norm(flow_direction)
+        self.radius = radius
 
         # Build geometry
         self.nodes = self._init_node_ring(centroid, n_nodes, radius, lut, cfg)
@@ -74,9 +75,7 @@ class EndothelialCell:
         centroid = self.centroid
 
         for node in self.nodes:
-            radial_vec = node.pos - centroid
-            radial_unit = radial_vec / np.linalg.norm(radial_vec)
-            projection = project_onto_axis(radial_unit, self.flow_axis)
+            projection = axial_projection(node.pos, centroid, self.flow_axis, self.radius)
 
             if projection > threshold:
                 node.role = 'downstream'
@@ -109,7 +108,7 @@ class EndothelialCell:
         Connects most upstream and downstream nodes. 
         """
         # Get nodes connecting stress fibre, and compute rest length
-        projections = project_onto_axis(self.positions, self.flow_axis)
+        projections = self.positions @ self.flow_axis
         up_id, dn_id = int(np.argmin(projections)), int(np.argmax(projections))
         up_node, dn_node = self.nodes[up_id], self.nodes[dn_id]
         sf_dist = projections.max() - projections.min()

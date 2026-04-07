@@ -24,6 +24,14 @@ def project_onto_axis(vecs, axis):
     
     return projections
 
+def axial_projection(pos, origin, axis, radius):
+    vec = pos - origin
+    axis = np.asarray(axis, dtype=float)
+    axis /= np.linalg.norm(axis)
+    dist = np.dot(vec, axis)
+    return np.clip(dist/(radius + 1e-8), -1.0, 1.0)
+
+
 def perpendicular(vec):
     """
     2D perpendicular vector to given vector. 
