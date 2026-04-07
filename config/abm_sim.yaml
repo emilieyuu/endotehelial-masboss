@@ -74,7 +74,7 @@ mechanics:
 
   # --- Stress fibre ---
   k_sf_fraction: 0.7 #sweep
-  nu_sf: 0.4 #sweep
+  nu_sf: 0.3 #sweep
   sf_sigma_fraction: 0.2
   rhoc_gain: 1.0
 

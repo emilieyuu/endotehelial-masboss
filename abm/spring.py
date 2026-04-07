@@ -12,7 +12,7 @@ class Spring:
     Cortical junction between two adjacent membrane nodes.
     """
 
-    def __init__(self, spring_id, node_1, node_2, rest_length, side, cfg):
+    def __init__(self, spring_id, node_1, node_2, rest_length, cfg):
         self.id = spring_id
         self.node_1, self.node_2 = node_1, node_2
         self.mech = cfg['mechanics']
@@ -27,7 +27,10 @@ class Spring:
         self.L_current = rest_length # Current/Activated length
         self.unit_vec = np.zeros(2) # Unit vector difference between nodes
         self.alignment = 0.0 # cos angle to flow
-        self.side = side # Pole or Flank depending on role of nodes
+        if self.node_1.role in ('upstream', 'downstream') or self.node_2.role in ('upstream', 'downstream'):
+            self.side = 'polar'
+        else: 
+            self.side = 'flank'
 
     # ------------------------------------------------------------------
     # 1. Update Geometry and Tension

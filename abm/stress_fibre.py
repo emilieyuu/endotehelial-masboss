@@ -11,7 +11,7 @@
 
 import numpy as np
 from abm.mechanics import hookes_law
-from abm.geometry import project_all, max_abs_projection, perpendicular
+from abm.geometry import perpendicular, project_onto_axis
 
 class StressFibre:
     """
@@ -64,73 +64,60 @@ class StressFibre:
                                k=k_sf) * self.a_sf
         
     # ------------------------------------------------------------------
-    # 3. Load Accumulation
+    # 2. Load Accumulation
     # ------------------------------------------------------------------
-    def accumulate_sf_loads(self, positions, nodes, centroid):
+    def accumulate_sf_loads(self, polar_nodes):
         """
-        Accumulate axial tension contributions to signalling. 
+        Accumulate SF axial tension for junction loading. 
         """
-        if self.t_sf < 1e-6: 
-            return
-        
-        projections = project_all(positions, centroid, self.axis_unit)
-        max_proj = max_abs_projection(projections)
 
-        for node, dx_mag in zip(nodes, projections):
-            weight_axial = (abs(dx_mag) / max_proj)**2
-            # print(f"tension {node.id}, dx_mag: {dx_mag}")
-            # print(f"tension {node.id}, weight_axial: {weight_axial}")
+        mid_point = self.cable_mid
+        radials = [n.pos - mid_point for n in polar_nodes]
+        projections = project_onto_axis(radials, self.axis_unit)
+        max_proj = max(abs(p) for p in projections) + 1e-8
 
-            node.tensile_load += self.t_sf * weight_axial
+        for node, proj_mag in zip(polar_nodes, projections):
+            weight_axial = (abs(proj_mag) / max_proj)**2
+            load = max(weight_axial * self.t_sf, 0.0)
+            node.tensile_load += load
 
     # ------------------------------------------------------------------
     # 3. Force Application
     # ------------------------------------------------------------------
 
     def apply_sf_forces(self, nodes, positions):
-        """Unified internal SF forces: Axial contraction and Gaussian squeeze."""
+        """Unified SF forces: Axial pull at poles, Parabolic squeeze at waist."""
         if self.t_sf < 1e-6:
             return
         
-        centroid = np.mean([n.pos for n in nodes], axis=0)
+        # Calculate half-length of the cell for normalization
         x_coords = [n.pos[0] for n in nodes]
         max_dx = (np.max(x_coords) - np.min(x_coords)) / 2
         
-        nu_sf = self.mech.get('nu_sf', 1.2)
-        sigma = self.L_current * 0.20 # Tight squeeze for the waist
+        nu_sf = self.mech.get('nu_sf', 0.3) # Scaled squeeze ratio
 
         for node in nodes:
-            dx_vec = node.pos - centroid
-            dx_mag = np.dot(dx_vec, self.axis_unit) # Projection on SF axis
+            # Distance from center projected onto SF axis
+            dx_vec = node.pos - self.cable_mid
+            dx_mag = np.dot(dx_vec, self.axis_unit) 
             
-            # 1. AXIAL INTERNAL PULL (Poles Only)
-            if node.role in ('upstream', 'downstream'):
-                weight_axial = (abs(dx_mag) / max_dx)**2
-                # Pull INWARD toward centroid
-                f_axial = -np.sign(dx_mag) * self.t_sf * weight_axial
-                # node.apply_force(f_axial * self.axis_unit)
-                node.tensile_load += self.t_sf * weight_axial
+            # Normalize distance (0 at center, 1 at poles)
+            dist_norm = min(abs(dx_mag) / max_dx, 1.0)
 
-            # 2. LATERAL GAUSSIAN SQUEEZE (All nodes)
-            weight_sq = np.exp(-(dx_mag**2) / (2 * sigma**2))
-            side_sign = np.sign(np.dot(dx_vec, self.perp_unit))
-            f_sq = -nu_sf * self.t_sf * weight_sq * side_sign * self.perp_unit
-            node.apply_force(f_sq)
-
-    def _apply_axial_forces(self, positions, nodes, centroid):
-        """
-        Apply axial contraction forces. 
-        """
-        projections = project_all(positions, centroid, self.axis_unit)
-        max_proj = max_abs_projection(projections)
-
-        for node, dx_mag in zip(nodes, projections):
-            weight_axial = (abs(dx_mag) / max_proj)**2
-
-            # Direction toward centroid
-            f_axial = -np.sign(dx_mag) * self.t_sf * weight_axial
-
+            # AXIAL PULL
+            weight_axial = dist_norm**2 
+            f_axial = -np.sign(dx_mag) * self.t_sf * weight_axial * 0.1 # 0.1 contraction fraction
             node.apply_force(f_axial * self.axis_unit)
+
+            # LATERAL SQUEEZE
+            weight_sq = 1 - (dist_norm**2)
+            
+            # Calculate which side of the SF the node is on
+            side_sign = np.sign(np.dot(dx_vec, self.perp_unit))
+            
+            # Apply inward force
+            f_sq = -nu_sf * self.t_sf * side_sign * weight_sq * self.perp_unit
+            node.apply_force(f_sq)
 
     # ------------------------------------------------------------------
     # 3. Update Activation

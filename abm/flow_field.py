@@ -3,7 +3,6 @@
 # Environmental flow field acting as external stimuli for cellular responses. 
 
 import numpy as np
-from abm.geometry import axis_alignment
 
 class FlowField:
     """
@@ -18,6 +17,7 @@ class FlowField:
         """
         direction = np.asarray(direction, dtype=float)
         norm = np.linalg.norm(direction)
+
         if norm < 1e-10:
             raise ValueError("Flow direction cannot be zero.")
 
@@ -29,23 +29,8 @@ class FlowField:
     def get_drag_force(self):
         return self.drag
     
-    def get_signalling_forces(self, node_normal):
-        """
-        Calculates tensile and tangential and total components at a point of the membrane. 
-        
-        f_normal: tensile component
-        f_tanegtial: sliding component
-        f_total: weighted magnitude
-            Junction proteins respon more strongly to tensile than tangential loading
-        """
-        alignment = axis_alignment(node_normal, self.direction)
-        f_normal = self.magnitude * abs(alignment) # tensile magnitude
-        f_mag = self.magnitude # uniform shear magnitude felt by all nodes
-        
-        return f_normal, f_mag
-
-    def get_force_on_node(self, node):
-        return self.direction * self.magnitude
+    def get_magnitude(self):
+        return self.magnitude
     
 
     def __repr__(self):
