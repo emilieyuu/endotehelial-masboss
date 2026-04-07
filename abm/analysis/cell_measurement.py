@@ -49,8 +49,8 @@ def measure_forces(cell):
     lat_springs  = [s for s in cell.springs if s.side == 'flank']
 
     # --- Shear ---
-    pole_fn = safe_mean([n.f_normal for n in pole_nodes])
-    lat_fn  = safe_mean([n.f_normal for n in lat_nodes])
+    # pole_fn = safe_mean([n.f_normal for n in pole_nodes])
+    # lat_fn  = safe_mean([n.f_normal for n in lat_nodes])
 
     # --- Cortical tension ---
     pole_tension   = safe_mean([s.t_cortex for s in pole_springs])
@@ -72,9 +72,9 @@ def measure_forces(cell):
 
     return {
         # Shear gradient
-        'shear_fn_pole':     round(pole_fn, 3),
-        'shear_fn_lat':      round(lat_fn, 3),
-        'shear_fn_diff':     round(pole_fn - lat_fn, 3),
+        # 'shear_fn_pole':     round(pole_fn, 3),
+        # 'shear_fn_lat':      round(lat_fn, 3),
+        # 'shear_fn_diff':     round(pole_fn - lat_fn, 3),
 
         # Cortex resistance
         'cortex_T_pole':     round(pole_tension, 4),

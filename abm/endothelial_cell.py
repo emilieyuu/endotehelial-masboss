@@ -15,6 +15,7 @@ from abm.membrane_node import MembraneNode
 from abm.spring import Spring
 from abm.stress_fibre import StressFibre
 from abm.analysis.cell_measurement import measure_forces, measure_shape
+from abm.geometry import get_pole_indices, length_along_axis, axial_weight, axial_sign, axis_alignment
 from src.utils import safe_mean
 
 class EndothelialCell:
@@ -26,8 +27,7 @@ class EndothelialCell:
         self.cfg = cfg
         self.lut = lut
 
-        flow = np.asarray(flow_direction, dtype=float)
-        self.flow_direction = flow / np.linalg.norm(flow)
+        self.flow_direction = flow_direction 
 
         # Build geometry
         self.nodes = self._init_node_ring(centroid, n_nodes, radius, lut, cfg)
@@ -110,22 +110,16 @@ class EndothelialCell:
     
     def _init_sf(self):
         """
-        Use only the centre pole node (closest to flow axis) per side.
-        One upstream FA, one downstream FA, one SF cabl connecting them. 
+        Initiate a single stress fibre cable along flow axis. 
+        Connects most upstream and downstream nodes. 
         """
-        # Find the single node closest to flow axis on each side
-        upstream_nodes = [n for n in self.nodes if n.role == 'upstream']
-        downstream_nodes = [n for n in self.nodes if n.role == 'downstream']
+        # Get nodes connecting stress fibre, and compute rest length
+        up_node, dn_node = self._get_pole_nodes()
+        sf_dist = length_along_axis(self.positions, self.flow_direction)
 
-        # Centre pole = node with smallest |y| on each side
-        up_centre = min(upstream_nodes,   key=lambda n: abs(n.pos[1]))
-        dn_centre = min(downstream_nodes, key=lambda n: abs(n.pos[1]))
-
-        # Calculate SF rest length
-        sf_dist = np.linalg.norm(dn_centre.pos - up_centre.pos)
-
-        # Single SF cable along flow axis
-        return StressFibre(up_centre, dn_centre, sf_dist, self.cfg)
+        return StressFibre(node_up=up_node, node_down=dn_node, 
+                           rest_length=sf_dist, cfg=self.cfg)
+    
     # ------------------------------------------------------------------
     # Properties
     # ------------------------------------------------------------------
@@ -137,6 +131,10 @@ class EndothelialCell:
     def centroid(self):
         return self.positions.mean(axis=0)
     
+    @property
+    def polar_nodes(self):
+        return [n for n in self. nodes if n.role in ("upstream", "downstream")]
+
     @property 
     def rhoc_mean(self):
         return float(np.mean([n.P_RhoC for n in self.nodes]))
@@ -145,6 +143,19 @@ class EndothelialCell:
     def rhoa_mean(self):
         return float(np.mean([n.P_RhoA for n in self.nodes]))
 
+    # ------------------------------------------------------------------
+    # Topology
+    # ------------------------------------------------------------------
+    def _get_node_springs(self, node_idx):
+        s_prev = self.springs[(node_idx - 1) % self.n_nodes]
+        s_next = self.springs[node_idx % self.n_nodes]
+        return s_prev, s_next
+    
+    def _get_pole_nodes(self):
+        """ Get indices of all polar nodes. """
+        i_up, i_dn = get_pole_indices(self.positions, self.flow_direction)
+        return self.nodes[i_up], self.nodes[i_dn]
+    
     # ------------------------------------------------------------------
     # Geometry
     # ------------------------------------------------------------------
@@ -174,6 +185,23 @@ class EndothelialCell:
         norm = np.linalg.norm(normal)
         return normal / norm if norm > 1e-10 else np.zeros(2)
     
+    def _compute_node_projections(self, node_idx):
+        """Outward unit normal at node, averaged from adjacent edges."""
+        n  = self.n_nodes
+        prev = self.nodes[(node_idx - 1) % n].pos
+        curr = self.nodes[node_idx].pos
+        nxt  = self.nodes[(node_idx + 1) % n].pos
+
+        e1 = curr - prev
+        e2 = nxt - curr
+
+        # Outward normals — rotate each edge 90° CCW
+        n1 = np.array([e1[1],  -e1[0]])
+        n2 = np.array([e2[1],  -e2[0]])
+
+        normal = n1 + n2
+        norm = np.linalg.norm(normal)
+        return normal / norm if norm > 1e-10 else np.zeros(2)
     # ------------------------------------------------------------------
     # Forces
     # ------------------------------------------------------------------
@@ -190,26 +218,13 @@ class EndothelialCell:
                     through junctions — stronger SF → neighbours resist more
                     → more outward force at poles.
         """
-        f_mag = flow_field.magnitude
-        drag_frac = self.cfg['flow'].get('drag_fraction', 0.2)
         centroid = self.centroid
 
         x_coords = [n.pos[0] for n in self.nodes]
         max_dx = (np.max(x_coords) - np.min(x_coords)) / 2
 
         for i, node in enumerate(self.nodes):
-            normal = self._compute_node_normal(i)
-            fn = flow_field.get_signalling_forces(normal)
-
-            s_prev = self.springs[(i - 1) % self.n_nodes]
-            s_next = self.springs[i % self.n_nodes]
-            avg_t = 0.5 * s_prev.t_cortex + s_next.t_cortex
-
-            # SIGNALLING LOAD:
-            # Poles sense full SF tension; flanks sense primarily flow.
-            alignment = abs(np.dot(normal, self.flow_direction)) 
-            node.f_normal_load = max(fn, 0.0) + (self.stress_fibre.t_sf * alignment) + avg_t
-            node.f_total_load = f_mag 
+            self._update_signalling_load(flow_field, node, i)
 
             if node.role in ('upstream', 'downstream'):
                 dx = node.pos[0] - centroid[0]
@@ -217,14 +232,36 @@ class EndothelialCell:
                 weight_axial = (abs(dx) / max_dx)**2
                 
                 # Forces: Base fluid drag + Reciprocal neighbor pull (eta * T_sf)
-                sf_ext_pull = self.stress_fibre.t_sf 
-                base_drag = abs(f_mag) * drag_frac
-                f_ext_total = (base_drag + sf_ext_pull) * weight_axial
+                #sf_ext_pull = self.stress_fibre.t_sf 
+                base_drag = flow_field.drag
+                f_ext_total = base_drag * weight_axial
+                node.tensile_load += f_ext_total
                 
                 # Pull outward from centroid along flow direction
                 axial_sign = np.sign(np.dot(node.pos - centroid, self.flow_direction))
                 node.apply_force(f_ext_total * axial_sign * self.flow_direction)
-            
+    
+    def _update_signalling_load(self, flow_field, node, idx):
+        """
+        Update tensile and total loads for protein recruitment
+        """
+        # Get relative node norma
+        normal = self._compute_node_normal(idx)
+
+        # Get tensile shear component and total magnitude
+        fnorm, fmag = flow_field.get_signalling_forces(normal)
+
+        # Get cortex tension at a node based on tension from neighbouring springs
+        s_prev, s_next = self._get_node_springs(idx)
+        cortex_tension = s_prev.t_cortex + s_next.t_cortex
+
+        # Compute sf tension felt at a node based on alignment
+        alignment = axis_alignment(normal, self.flow_direction) # change to alignment to sf unit vec??
+        sf_tension = self.stress_fibre.t_sf * 2 * alignment
+
+        # Compute tensile and total load
+        node.f_tensile_load = sf_tension + cortex_tension + max(fmag, 0.0) 
+        node.shear_total = max(fmag, 0.0)
 
     def _apply_pressure(self):
         """
@@ -288,6 +325,10 @@ class EndothelialCell:
         Signalling reads geometry AFTER integration (current deformed state).
         SF cables updated last — a_sf drives next step's cable forces.
         """
+        for n in self.nodes: 
+            n.reset_loads()
+            n.reset_force()
+
         # -- Force Accumulation --
         # 1. Uniform shear on all nodes
         self._apply_shear(flow_field)
@@ -295,11 +336,16 @@ class EndothelialCell:
         # 2. Cortical spring geometry and forces
         for s in self.springs:
             s.update_cortex_geometry_tension(self.flow_direction)
+
+        for s in self.springs:
+            s.accumulate_cortex_loads()
+
         for s in self.springs:
             s.apply_cortex_forces()
 
         # 3. SF geometry and and forces
         self.stress_fibre.update_sf_geometry_tension()
+        #self.stress_fibre.accumulate_sf_loads(self.positions, self.nodes, self.centroid)
         self.stress_fibre.apply_sf_forces(self.nodes, self.positions)
 
         # 8. Soft pressure (area conservation)
@@ -319,7 +365,8 @@ class EndothelialCell:
             node.update_signalling()
 
         for s in self.springs:
-            s.update_cortex_stiffness(self.rhoa_mean)
+            s.update_cortex_stiffness()
+
         self.stress_fibre.update_sf_activation(
             mean_rhoc=self.rhoc_mean, dt=dt
         )
@@ -348,7 +395,7 @@ class EndothelialCell:
             'sf_tension': round(self.stress_fibre.t_sf, 3),
             'k_active_pole': round(np.mean([s.k_active for s in polar]), 3) if polar else 0,
             'k_active_flank': round(np.mean([s.k_active for s in flank]), 3) if flank else 0,
-            'f_normal_pole': safe_mean([n.f_normal_load for n in self.nodes if n.role in ('upstream', 'downstream')]),
+            'f_tensile_pole': safe_mean([n.f_tensile_load for n in self.nodes if n.role in ('upstream', 'downstream')]),
             'f_total': safe_mean([n.f_total_load for n in self.nodes]),
         }
     

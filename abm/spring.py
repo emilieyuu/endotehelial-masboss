@@ -51,15 +51,28 @@ class Spring:
         # Bilinear tension using current k_active
         kc_ratio = self.mech.get('kc_ratio', 0.1)
         self.t_cortex = bilinear_tension(
-            l=self.L_current, l0=self.L_cortex, k=self.k_active, kc_ratio=kc_ratio
+            l=self.L_current, l0=self.L_cortex, 
+            k=self.k_active, kc_ratio=kc_ratio
         ) 
 
     # ------------------------------------------------------------------
-    # 2. Force Application
+    # 2. Load Accumulation
+    # ------------------------------------------------------------------
+    def accumulate_cortex_loads(self):
+        """
+        Compute spring signalling load contribution
+        """
+        load = max(self.t_cortex, 0.0)  # tensile only
+
+        self.node_1.tensile_load += load
+        self.node_2.tensile_load += load
+
+    # ------------------------------------------------------------------
+    # 3. Force Application
     # ------------------------------------------------------------------
     def apply_cortex_forces(self):
         """
-        Apply equal and opposite forces on connected nodes.
+        Apply equal and opposite mechanical forces on connected nodes.
         Pulls nodes together in the tensile regime. 
         Pushes nodes apart in the compressive regime. 
         """
@@ -67,11 +80,11 @@ class Spring:
 
         self.node_1.apply_force(force_vec)
         self.node_2.apply_force(-force_vec)
-    
+
     # ------------------------------------------------------------------
-    # 3. Update Cortex Stiffness (after signalling)
+    # 4. Update Cortex Stiffness (after signalling)
     # ------------------------------------------------------------------
-    def update_cortex_stiffness(self, mean_rhoa):
+    def update_cortex_stiffness(self):
         """
         Updates cortex stiffness from local RhoA.
         """

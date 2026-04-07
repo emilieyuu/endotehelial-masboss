@@ -1,4 +1,7 @@
-# abm_v2/membrane_node.py
+# abm/membrane_node.py
+#
+#
+
 import numpy as np
 from abm.signalling import get_protein_recruitment
 
@@ -7,47 +10,48 @@ class MembraneNode:
     def __init__(self, node_id, position, lut, cfg):
         self.id = node_id
         self.pos = np.array(position, dtype=float)
+
+        # --- Mechanics ---
         self.force = np.zeros(2)
         self.role = 'lateral'
+
+        # --- Load channels ---
+        self.f_tensile_load = 0.0
+        self.f_total_load = 0.0
+        self.tensile_load = 0.0 # accumulated tension (SF + cortex)
+        self.shear_total = 0.0 # from flow – total magnitude
+
+        # --- Sigalling ---
         self.lut = lut
         self.cfg = cfg
 
-        # Shear Inputs (set by EndothelialCell._apply_shear())
-        self.f_normal = 0.0 # tensile component
-        self.f_total = 0.0 # weighted magnitude for TJP1
-        self.f_normal_load = 0.0
-        self.f_total_load = 0.0
-
-        # Signalling state, computed by update_signalling()
         self.DSP, self.TJP1, self.JCAD = 0.0, 0.0, 0.0
         self.P_RhoA, self.P_RhoC = 0.0,  0.0
-
-    def update_signalling(self):
+    
+    # ------------------------------------------------------------------
+    # Load & Force Reset 
+    # ------------------------------------------------------------------
+    def reset_loads(self):
         """
-        Compute junction protein recruitment local shear components.
-
-        DSP:  tensile loading (f_normal) — pole-enriched
-        TJP1: total shear magnitude (f_total) — near-uniform
-        JCAD: tensile loading (f_normal) — pole-enriched
-        
-        Proteins → LUT → RhoA, RhoC stored for Spring and Cell.
+        Reset signalling loads. 
+        Called at the start of each timestep.
         """
-        # Get shear input
-        tau_dsp  = max(self.f_normal_load, 0.0)  
-        tau_tjp1 = max(self.f_total_load, 0.0) 
-        tau_jcad = max(self.f_total_load, 0.0) 
+        self.tensile_load = 0.0
+        self.shear_total = 0.0
 
-        # Compute junction protein recruitment
-        self.DSP  = get_protein_recruitment(self.cfg, tau_dsp, 'DSP')
-        self.TJP1 = get_protein_recruitment(self.cfg, tau_tjp1, 'TJP1')
-        self.JCAD = get_protein_recruitment(self.cfg, tau_jcad, 'JCAD')
+    def reset_force(self):
+        """
+        Reset signalling loads. 
+        Called at the start of each timestep.
+        """
+        self.force[:] = 0.0
 
-        # Compute RhoA/RhoC activation
-        self.P_RhoA, self.P_RhoC = self.lut.query(self.DSP, self.TJP1, self.JCAD)
-
+    # ------------------------------------------------------------------
+    # Force Accumulation & Integration
+    # ------------------------------------------------------------------
     def apply_force(self, force):
         """
-        Accumulate force contribution to this node.  
+        Accumulate mechanical force.  
         """
         force = np.asarray(force)
         self.force += force
@@ -64,8 +68,36 @@ class MembraneNode:
             displacement = displacement / d_norm * max_displacement
 
         self.pos += displacement 
-        self.force = np.zeros(2) 
-            
+
+    # ------------------------------------------------------------------
+    # Siganlling
+    # ------------------------------------------------------------------
+    def update_signalling(self):
+        """
+        Compute junction protein recruitment from accumulated loads
+
+        DSP:  tensile loading 
+        TJP1: total shear magnitude 
+        JCAD: total shear magnitude 
+        
+        Proteins → LUT → RhoA, RhoC.
+        """
+        # Clamp inputs
+        tau_dsp  = max(self.tensile_load, 0.0)  
+        tau_tjp1 = max(self.shear_total, 0.0) 
+        tau_jcad = max(self.shear_total, 0.0) 
+
+        # Junction protein recruitment
+        self.DSP  = get_protein_recruitment(self.cfg, tau_dsp, 'DSP')
+        self.TJP1 = get_protein_recruitment(self.cfg, tau_tjp1, 'TJP1')
+        self.JCAD = get_protein_recruitment(self.cfg, tau_jcad, 'JCAD')
+
+        # RhoA/RhoC activation
+        self.P_RhoA, self.P_RhoC = self.lut.query(self.DSP, self.TJP1, self.JCAD)
+
+    # ------------------------------------------------------------------
+    # Diagnostics
+    # ------------------------------------------------------------------      
     def __repr__(self):
         return (
             f"MembraneNode(id={self.id} | role={self.role} | "

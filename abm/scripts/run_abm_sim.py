@@ -83,10 +83,13 @@ def run_abm_sim_single(cfg, lut, n_steps, perturbation = 'WT', plot=False):
     dt = cfg['integration'].get('dt', 0.1)
     n_nodes = cfg['cell_geometry'].get('n_nodes', 16)
     radius = cfg['cell_geometry'].get('radius', 12)
-    f_magnitude = cfg['flow'].get('f_magnitude', 12)
+
+    f_magnitude = cfg['flow'].get('f_magnitude', 10)
+    f_direction = np.array(cfg['flow'].get('f_direction', [1.0, 0.0]))
+    drag_frac = cfg['flow'].get('f_drag_fraction', 0.1)
 
     # Initiate flowfield and cell
-    flow = FlowField(magnitude=f_magnitude)
+    flow = FlowField(magnitude=f_magnitude, drag_frac=drag_frac, direction=f_direction)
     cell = EndothelialCell( 
         cell_id=0, centroid=np.array([0.0, 0.0]),
         lut=lut, cfg=cfg,

@@ -38,26 +38,26 @@ cell_geometry:
 flow:
   f_magnitude: 10.0
   f_direction: [1.0, 0.0]
-  drag_fraction: 0.2 # sweep
+  f_drag_fraction: 0.2 # sweep
 
 # -----------------------------------------------------------------------------
 # SIGNALLING — Hill function parameters for junction protein recruitment
 # -----------------------------------------------------------------------------
 hill_params:
   DSP:
-    K_mult: 1.2 #1.4  # f_magnitude/4
-    n: 4 # moderate cooperativity — tensile junction sensor
+    K: 12 #
+    n: 2 # 
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false   # set true for DSP_KO perturbation
 
   TJP1:
-    K_mult: 0.6 #5 # f_magnitude/6
+    K: 6 #5 # f_magnitude/6
     n: 2 # low cooperativity — total shear sensor
     p_max: 0.67 # MaBoSS LUT ceiling — fixed
     knocked_out: false
 
   JCAD:
-    K_mult: 0.4 #3
+    K: 4 #3
     n: 2 # high cooperativity — sharp pole amplifier
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false
@@ -75,6 +75,7 @@ mechanics:
   # --- Stress fibre ---
   k_sf_fraction: 0.7 #sweep
   nu_sf: 0.4 #sweep
+  sf_sigma_fraction: 0.2
   rhoc_gain: 1.0
 
   # --- remodelling ---

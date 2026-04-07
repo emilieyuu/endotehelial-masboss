@@ -11,10 +11,11 @@
 
 import numpy as np
 from abm.mechanics import hookes_law
+from abm.geometry import project_all, max_abs_projection, perpendicular
 
 class StressFibre:
     """
-    Contractile stress fibre cable along flow axis. 
+    Contractile stress fibre cable along flow axis, connects upstream and downstream poles. 
     """
 
     def __init__(self, node_up, node_down, rest_length, cfg):
@@ -26,13 +27,13 @@ class StressFibre:
         self.L_sf = rest_length 
         self.a_sf = 0.0 
         self.t_sf = 0.0 # axial cable tension
+        self.nu_sf = cfg['mechanics']['nu_sf']
 
         # Geometry 
         self.L_current = 0.0
-        self.unit_vec = np.zeros(2)
+        self.axis_unit = np.zeros(2)
         self.perp_unit = np.zeros(2)
         self.cable_mid = 0.0 
-
 
     # ------------------------------------------------------------------
     # 1. Update Geometry and Tension
@@ -44,7 +45,7 @@ class StressFibre:
         Zero when slack (L <= L0) or inactive (a_sf ≈ 0).
         """
         # --- Geometry ---
-        diff   = self.node_down.pos - self.node_up.pos
+        diff = self.node_down.pos - self.node_up.pos
         length = np.linalg.norm(diff)
 
         if length < 1e-10:
@@ -52,16 +53,38 @@ class StressFibre:
 
         self.L_current = length
         
-        self.unit_vec  = diff / length
-        self.perp_unit = np.array([-self.unit_vec[1], self.unit_vec[0]])
+        # --- Define axes ---
+        self.axis_unit = diff / length # flow/SF axis
+        self.perp_unit = perpendicular(self.axis_unit)
         self.cable_mid = 0.5 * (self.node_up.pos + self.node_down.pos)
 
         # --- Tension ---
         k_sf = self.mech.get('k_sf_fraction', 0.5) * self.mech.get('k_cortex', 1.0)
-        self.t_sf = hookes_law(l=self.L_current, l0=self.L_sf, k=k_sf) * self.a_sf
+        self.t_sf = hookes_law(l=self.L_current, l0=self.L_sf, 
+                               k=k_sf) * self.a_sf
+        
+    # ------------------------------------------------------------------
+    # 3. Load Accumulation
+    # ------------------------------------------------------------------
+    def accumulate_sf_loads(self, positions, nodes, centroid):
+        """
+        Accumulate axial tension contributions to signalling. 
+        """
+        if self.t_sf < 1e-6: 
+            return
+        
+        projections = project_all(positions, centroid, self.axis_unit)
+        max_proj = max_abs_projection(projections)
+
+        for node, dx_mag in zip(nodes, projections):
+            weight_axial = (abs(dx_mag) / max_proj)**2
+            # print(f"tension {node.id}, dx_mag: {dx_mag}")
+            # print(f"tension {node.id}, weight_axial: {weight_axial}")
+
+            node.tensile_load += self.t_sf * weight_axial
 
     # ------------------------------------------------------------------
-    # 2. Force Application
+    # 3. Force Application
     # ------------------------------------------------------------------
 
     def apply_sf_forces(self, nodes, positions):
@@ -78,70 +101,37 @@ class StressFibre:
 
         for node in nodes:
             dx_vec = node.pos - centroid
-            dx_mag = np.dot(dx_vec, self.unit_vec) # Projection on SF axis
-            #print(f"({node.id}), dx_mag {dx_mag}")
+            dx_mag = np.dot(dx_vec, self.axis_unit) # Projection on SF axis
             
             # 1. AXIAL INTERNAL PULL (Poles Only)
             if node.role in ('upstream', 'downstream'):
                 weight_axial = (abs(dx_mag) / max_dx)**2
                 # Pull INWARD toward centroid
-                f_axial = -np.sign(dx_mag) * self.t_sf * weight_axial * self.unit_vec
-                #print(f"({node.id}), axial force {f_axial}")
-                node.apply_force(f_axial)
+                f_axial = -np.sign(dx_mag) * self.t_sf * weight_axial
+                # node.apply_force(f_axial * self.axis_unit)
+                node.tensile_load += self.t_sf * weight_axial
 
             # 2. LATERAL GAUSSIAN SQUEEZE (All nodes)
             weight_sq = np.exp(-(dx_mag**2) / (2 * sigma**2))
             side_sign = np.sign(np.dot(dx_vec, self.perp_unit))
             f_sq = -nu_sf * self.t_sf * weight_sq * side_sign * self.perp_unit
-            #print(f"({node.id}), squeeze force {f_sq}")
             node.apply_force(f_sq)
 
-            # Implement hydraulic_gain instead of area conservation??
-    
-    def _apply_axial_forces(self, nodes):
+    def _apply_axial_forces(self, positions, nodes, centroid):
         """
-        Contractile pull force along SF axis, distributed evenly across pole nodes. 
-        Upstream poles pulled downstream, downstream poles pulled upstream. 
+        Apply axial contraction forces. 
         """
-        force = self.t_sf * self.unit_vec
+        projections = project_all(positions, centroid, self.axis_unit)
+        max_proj = max_abs_projection(projections)
 
-        up_nodes = [n for n in nodes if n.role == "upstream"]
-        dn_nodes = [n for n in nodes if n.role == "downstream"]
-        n_poles = len(up_nodes)
-        if n_poles == 0:
-            return
-        
-        for node in up_nodes:
-            node.apply_force(force/n_poles)
-        for node in dn_nodes:
-            node.apply_force(-force/n_poles)
+        for node, dx_mag in zip(nodes, projections):
+            weight_axial = (abs(dx_mag) / max_proj)**2
 
+            # Direction toward centroid
+            f_axial = -np.sign(dx_mag) * self.t_sf * weight_axial
 
-    def _apply_lateral_squeeze(self, nodes, positions):
-        """
-        Gaussian squeeze to prevent buckling.
-        Focuses the 'pinch' on the middle of the cell length.
-        """
-        centroid = np.mean([n.pos for n in nodes], axis=0)
-        x_coords = [n.pos[0] for n in nodes]
-        cell_length = np.max(x_coords) - np.min(x_coords)
-        
-        # Sigma controls the 'width' of the squeeze zone (20% of cell length)
-        sigma = cell_length * 0.2 
-        nu_sf = self.mech.get('nu_sf', 0.8) # Higher nu_sf = more 'pop'
+            node.apply_force(f_axial * self.axis_unit)
 
-        for node in nodes:
-            dx = node.pos[0] - centroid[0]
-            # Gaussian weight: 1.0 at center (x=0), drops off toward poles
-            weight = np.exp(-(dx**2) / (2 * sigma**2))
-            
-            # Determine if node is top or bottom half to set squeeze direction
-            dy_sign = np.sign(node.pos[1] - centroid[1])
-            f_squeeze = -nu_sf * self.t_sf * weight * dy_sign
-            
-            # Apply strictly in the Y-axis (Perpendicular to flow)
-            node.apply_force(np.array([0.0, f_squeeze]))
-        
     # ------------------------------------------------------------------
     # 3. Update Activation
     # ------------------------------------------------------------------

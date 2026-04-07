@@ -1,21 +1,34 @@
-# abm_v2/flow_field.py
+# abm/flow_field.py
+#
+# Environmental flow field acting as external stimuli for cellular responses. 
 
 import numpy as np
+from abm.geometry import axis_alignment
 
 class FlowField:
-
-    def __init__(self, magnitude=1.0, direction=None):
-        if direction is None:
-            direction = np.array([1.0, 0.0])
-
+    """
+    External flow acting on membrane nodes and junctions. 
+    1. Drag
+    2. Tensile loading
+    """
+    def __init__(self, magnitude, drag_frac, direction=np.array([1.0, 0.0])):
+        """
+        magnitude: magnitude of flow (non-dimensional)
+        direction: unit-vector representationg of flow direction
+        """
         direction = np.asarray(direction, dtype=float)
         norm = np.linalg.norm(direction)
         if norm < 1e-10:
             raise ValueError("Flow direction cannot be zero.")
 
-        self.magnitude  = magnitude
-        self.direction  = direction / norm
+        self.magnitude = magnitude
+        self.drag = magnitude * drag_frac
+        self.direction = direction / norm
+        print(f">>> INFO: Initiated flow field with magnitude {self.magnitude} and unit direction {self.direction}")
 
+    def get_drag_force(self):
+        return self.drag
+    
     def get_signalling_forces(self, node_normal):
         """
         Calculates tensile and tangential and total components at a point of the membrane. 
@@ -25,15 +38,11 @@ class FlowField:
         f_total: weighted magnitude
             Junction proteins respon more strongly to tensile than tangential loading
         """
-        cos_theta = np.dot(self.direction, node_normal)
-        f_n = self.magnitude * abs(cos_theta) # tensile magnitude
-        f_t = self.magnitude * np.sqrt(1 - cos_theta**2) # tangential magnitude
+        alignment = axis_alignment(node_normal, self.direction)
+        f_normal = self.magnitude * abs(alignment) # tensile magnitude
+        f_mag = self.magnitude # uniform shear magnitude felt by all nodes
         
-        # Weighted total magnitude
-        tangential_weight = 0.5
-        f_total = np.sqrt(f_n**2 + tangential_weight * f_t**2)
-
-        return f_n
+        return f_normal, f_mag
 
     def get_force_on_node(self, node):
         return self.direction * self.magnitude
