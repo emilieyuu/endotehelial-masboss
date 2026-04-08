@@ -21,7 +21,7 @@ class MembraneNode:
         self.force = np.zeros(2)
 
         # --- Load channels --
-        self.tensile_load = 0.0 # accumulated tension (magnitude + SF + cortex)
+        self.tensile_load = 0.0 # accumulated tension (magnitude + SF + cortex) 
         self.shear_total = 0.0 # magnitude of flow (shear stress)
 
         # --- Sigalling ---

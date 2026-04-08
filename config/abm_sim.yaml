@@ -70,15 +70,19 @@ mechanics:
   # --- Cortical spring ---
   k_cortex_base: 1.0 # Baseline for all other stiffness
   k_cortex_range: 2.0
-  kc_ratio: 0.1 # From Jakob et al. 
-  a_cortex_base: 0.95 # From Jakob et al. 
-  a_cortex_range: 0.2
+
+  a_cortex_base: 0.95 # From Jakob et al., Baseline cortex contraction at homeostasis
+  a_cortex_range: 0.2 # Recruitment capacity – maximum additional conrtex contraction from RhoA
 
   # --- Stress fibre ---
   k_sf_fraction: 0.7 # From Jakob et al. 
   nu_sf: 0.3 # From Deshpade et al. 
-  a_sf_base: 1.0
-  a_sf_range: 0.3
+
+  a_sf_base: 1.0 # Baseline SF is relaxed, only activated on stimulus
+  a_sf_range: 0.3 # Recruitment capacity – maximum additional SF contraction from RhoC
+
+  # --- Compressive Stiffness ---
+  kc_ratio: 0.1 # From Jakob et al. 
 
   # --- remodelling ---
   tau_remodel: 30.0

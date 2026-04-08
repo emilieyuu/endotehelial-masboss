@@ -27,9 +27,10 @@ class Spring:
         self.a_cortex_range = self.mech.get('a_cortex_range', 0.2)
         self.a_cortex = self.a_cortex_base # Iniate at base
 
-        self.k_cortex_base = self.mech.get('k_cortex', 1.0) # Basal stiffness
+        self.k_cortex_base = self.mech.get('k_cortex', 1.0) # Basal Contractile stiffness
         self.k_cortex_range = self.mech.get('k_cortex_range', 1.0)
         self.k_cortex = self.k_cortex_base # Initiate at base
+        self.kc_ratio = self.mech.get('kc_ratio', 0.1) # Compressive stiffness 
 
         self.L_cortex = rest_length 
         self.t_cortex = 0.0 
@@ -63,10 +64,9 @@ class Spring:
         
         # --- Tension ---
         # Bilinear tension using current k_active
-        kc_ratio = self.mech.get('kc_ratio', 0.1)
         self.t_cortex = bilinear_tension(
             l=self.L_current, l0=self.L_cortex * self.a_cortex, 
-            k=self.k_cortex, kc_ratio=kc_ratio
+            k=self.k_cortex, kc_ratio=self.kc_ratio
         ) 
 
     # ------------------------------------------------------------------
@@ -74,12 +74,12 @@ class Spring:
     # ------------------------------------------------------------------
     def accumulate_cortex_loads(self):
         """
-        Compute spring signalling load contribution
+        Compute spring load contribution and add to endpoint nodes. 
         """
         load = max(self.t_cortex, 0.0)  # tensile only
 
-        self.node_1.tensile_load += load
-        self.node_2.tensile_load += load
+        self.node_1.add_tensile_load(load)
+        self.node_2.add_tensile_load(load)
 
     # ------------------------------------------------------------------
     # 3. Force Application
@@ -102,17 +102,17 @@ class Spring:
         """
         Updates cortex stiffness from local RhoA.
         """
-        # Compute mean RhoA of connecting nodes
+        # Compute RhoA signal as of connecting nodes
         local_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
-   
-        # Compute activation directly of RhoA level 
         rhoa_signal = float(np.clip(local_rhoa, 0.0, 1.0))
 
         # Instant stiffness update (operates on seconds timescale)
-        self.k_cortex = self.k_cortex_base + rhoa_signal * 2.0
+        # Baseline 1.0, max 3.0 when RhoA is 1.0
+        self.k_cortex = self.k_cortex_base + (rhoa_signal * self.k_cortex_range)
 
-        a_target = self.a_cortex_base - rhoa_signal * self.a_cortex_range
-
+        # First-order relaxation activation update towards RhoA-dependent target
+        # Baseline 0.95, drops toward 0.75 at max RhoA
+        a_target = self.a_cortex_base - (rhoa_signal * self.a_cortex_range)
         rate = dt / self.mech.get('tau_remodel', 30)
         self.a_cortex += rate * (a_target - self.a_cortex)
         self.a_cortex = float(np.clip(self.a_cortex , 0.0, 1.0))

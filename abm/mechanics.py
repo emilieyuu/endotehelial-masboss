@@ -26,8 +26,10 @@ def hill(tau, K, n):
     K: half-activation threshold
     n: Hill coefficient (switch sharpness)
     """
+    # No recruitment under compression. 
     if tau <= 0: 
-        return 0.0 # No recruitment under compression. 
+        return 0.0 
+    
     return tau**n / (K**n + tau**n)
 
     
