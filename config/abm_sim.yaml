@@ -28,7 +28,7 @@ integration:
 cell_geometry:
   n_nodes: 16
   radius: 12.0
-  init_ar: 1.2
+  init_ar: 1.0
   polar_threshold: 0.866
 
 
@@ -45,13 +45,13 @@ flow:
 # -----------------------------------------------------------------------------
 hill_params:
   DSP:
-    K: 12 #
+    K: 20 #
     n: 3 # 
     p_max: 0.67         # MaBoSS LUT ceiling — fixed
     knocked_out: false   # set true for DSP_KO perturbation
 
   TJP1:
-    K: 6 #5 # f_magnitude/6
+    K: 8 #5 # f_magnitude/6
     n: 2 # low cooperativity — total shear sensor
     p_max: 0.67 # MaBoSS LUT ceiling — fixed
     knocked_out: false
@@ -68,15 +68,17 @@ hill_params:
 # -----------------------------------------------------------------------------
 mechanics:
   # --- Cortical spring ---
-  k_cortex: 1.0 # Baseline for all other stiffness
-  kc_ratio: 0.1
-  rhoa_gain: 5.0 # sweep
+  k_cortex_base: 1.0 # Baseline for all other stiffness
+  k_cortex_range: 2.0
+  kc_ratio: 0.1 # From Jakob et al. 
+  a_cortex_base: 0.95 # From Jakob et al. 
+  a_cortex_range: 0.2
 
   # --- Stress fibre ---
-  k_sf_fraction: 0.7 # Jakob
-  nu_sf: 0.3 # Deshpade
-  sf_contract_fraction: 0.1
-  rhoc_gain: 1.0 # sweep
+  k_sf_fraction: 0.7 # From Jakob et al. 
+  nu_sf: 0.3 # From Deshpade et al. 
+  a_sf_base: 1.0
+  a_sf_range: 0.3
 
   # --- remodelling ---
   tau_remodel: 30.0

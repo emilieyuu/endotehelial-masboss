@@ -2,17 +2,6 @@
 #
 # Pure mathematical functions used by mechanical classes.
 
-def hookes_law(l, l0, k):
-    """
-    Hooke's Law: tension-only spring. 
-    Returns positive tension when stretched (L > L0).
-    Returns zero when compressed (cable goes slack).
-    """
-    extension = l - l0
-    if extension <= 0: 
-        return 0
-    return extension * k
-
 def bilinear_tension(l, l0, k, kc_ratio=0.1):
     """
     Bilinear spring: stiff in tension, soft in compression.

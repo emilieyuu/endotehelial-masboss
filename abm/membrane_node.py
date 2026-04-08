@@ -1,6 +1,11 @@
 # abm/membrane_node.py
 #
+# A "geometric" point on the cell membrane, containing a "state". 
 #
+# Responsibilities:
+#   1. Mechanics
+#   2. Load Accumulation
+#   3. Signalling
 
 import numpy as np
 from abm.signalling import get_protein_recruitment
@@ -10,16 +15,14 @@ class MembraneNode:
     def __init__(self, node_id, position, lut, cfg):
         self.id = node_id
         self.pos = np.array(position, dtype=float)
+        self.role = 'lateral'
 
         # --- Mechanics ---
         self.force = np.zeros(2)
-        self.role = 'lateral'
 
-        # --- Load channels ---
-        self.f_tensile_load = 0.0
-        self.f_total_load = 0.0
-        self.tensile_load = 0.0 # accumulated tension (SF + cortex)
-        self.shear_total = 0.0 # from flow – total magnitude
+        # --- Load channels --
+        self.tensile_load = 0.0 # accumulated tension (magnitude + SF + cortex)
+        self.shear_total = 0.0 # magnitude of flow (shear stress)
 
         # --- Sigalling ---
         self.lut = lut
@@ -29,7 +32,7 @@ class MembraneNode:
         self.P_RhoA, self.P_RhoC = 0.0,  0.0
         
     # ------------------------------------------------------------------
-    # Load & Force Reset 
+    # 1. Load & Force Reset 
     # ------------------------------------------------------------------
     def reset_loads(self):
         """
@@ -41,14 +44,26 @@ class MembraneNode:
 
     def reset_force(self):
         """
-        Reset signalling loads. 
+        Reset force accumulation.  
         Called at the start of each timestep.
         """
         self.force[:] = 0.0
 
     # ------------------------------------------------------------------
-    # Force Accumulation & Integration
+    # Load & Force Accumulation 
     # ------------------------------------------------------------------
+    def add_tensile_load(self, load):
+        """
+        Accumulate tensile loading for DSP recruitment
+        """
+        self.tensile_load += load
+
+    def set_shear(self, shear):
+        """
+        Set shear magnitude felt by nodes (from flow)
+        """
+        self.shear_total = shear
+
     def apply_force(self, force):
         """
         Accumulate mechanical force.  
@@ -56,8 +71,13 @@ class MembraneNode:
         force = np.asarray(force)
         self.force += force
 
+    # ------------------------------------------------------------------
+    # 2. Force Integration
+    # ------------------------------------------------------------------
     def integrate_step(self, dt, gamma, max_displacement=0.5):
         """
+        Converts net force to displacement.
+
         Overdamped integration: dx = (F / gamma) × dt.
         Displacement clamped to max_displacement for numerical stability.
         """
@@ -70,7 +90,7 @@ class MembraneNode:
         self.pos += displacement 
 
     # ------------------------------------------------------------------
-    # Siganlling
+    # 3. Siganlling
     # ------------------------------------------------------------------
     def update_signalling(self):
         """
@@ -83,7 +103,7 @@ class MembraneNode:
         Proteins → LUT → RhoA, RhoC.
         """
         # Clamp inputs
-        tau_dsp  = max(self.tensile_load, 0.0)  
+        tau_dsp  = max(self.tensile_load, 0.0)
         tau_tjp1 = max(self.shear_total, 0.0) 
         tau_jcad = max(self.shear_total, 0.0) 
 
@@ -96,8 +116,34 @@ class MembraneNode:
         self.P_RhoA, self.P_RhoC = self.lut.query(self.DSP, self.TJP1, self.JCAD)
 
     # ------------------------------------------------------------------
+    # Getters
+    # ------------------------------------------------------------------ 
+    def get_rhoa(self): 
+        return self.P_RhoA
+    
+    def get_rhoc(self):
+        return self.P_RhoC
+    
+    def get_force(self):
+        return self.force
+
+    # ------------------------------------------------------------------
     # Diagnostics
-    # ------------------------------------------------------------------      
+    # ------------------------------------------------------------------  
+    def get_state(self):
+        return {
+            'id': self.id, 
+            'position': (self.pos[0].round(2), self.pos[1].round(2)), 
+            'role': self.role, 
+            'tensile_load': self.tensile_load, 
+            'shear_total': self.shear_total, 
+            'DSP': self.DSP, 
+            'TJP1': self.TJP1, 
+            'JCAD': self.JCAD, 
+            'RhoA': self.P_RhoA, 
+            'RhoC': self.P_RhoC
+        }    
+    
     def __repr__(self):
         return (
             f"MembraneNode(id={self.id} | role={self.role} | "

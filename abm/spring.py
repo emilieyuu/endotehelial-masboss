@@ -1,8 +1,13 @@
 # abm/spring.py
 #
-# Cortical spring between adjacent membran nodes. 
-# Stiffness modulated by RhoA: k_active = k_cortex + (rhoa_gain * mean_rhoa)
-# Tension from bilinear law: stiff in tension, soft in compression
+# Cortical spring between adjacent membrane nodes. 
+# 
+# Responsibilities: 
+#   1. Holds state (rest length, stiffness, activation, side, alignment)
+#   2. Computes bilinear tension from current geometry
+#   3. Applies equal-and-opposite forces on endpoint nodes
+#   4. Adds tension to tensile load accumulator
+#   5. Updates activation and stiffness based on mean RhoA from endpoint nodes
 
 import numpy as np
 from abm.mechanics import bilinear_tension
@@ -11,17 +16,23 @@ class Spring:
     """
     Cortical junction between two adjacent membrane nodes.
     """
-
     def __init__(self, spring_id, node_1, node_2, rest_length, cfg):
+
         self.id = spring_id
         self.node_1, self.node_2 = node_1, node_2
         self.mech = cfg['mechanics']
 
         # Cortical properties
-        self.k_cortex = self.mech.get('k_cortex', 1.0) # Basal stiffness
-        self.L_cortex = rest_length # Initiation length
-        self.k_active = self.k_cortex # Effective stiffness, modulated by RhoA
-        self.t_cortex = 0.0 # Tension of spring
+        self.a_cortex_base = self.mech.get('a_cortex_base', 0.95) # Pretension
+        self.a_cortex_range = self.mech.get('a_cortex_range', 0.2)
+        self.a_cortex = self.a_cortex_base # Iniate at base
+
+        self.k_cortex_base = self.mech.get('k_cortex', 1.0) # Basal stiffness
+        self.k_cortex_range = self.mech.get('k_cortex_range', 1.0)
+        self.k_cortex = self.k_cortex_base # Initiate at base
+
+        self.L_cortex = rest_length 
+        self.t_cortex = 0.0 
 
         # Geometry
         self.L_current = rest_length # Current/Activated length
@@ -54,8 +65,8 @@ class Spring:
         # Bilinear tension using current k_active
         kc_ratio = self.mech.get('kc_ratio', 0.1)
         self.t_cortex = bilinear_tension(
-            l=self.L_current, l0=self.L_cortex, 
-            k=self.k_active, kc_ratio=kc_ratio
+            l=self.L_current, l0=self.L_cortex * self.a_cortex, 
+            k=self.k_cortex, kc_ratio=kc_ratio
         ) 
 
     # ------------------------------------------------------------------
@@ -87,19 +98,24 @@ class Spring:
     # ------------------------------------------------------------------
     # 4. Update Cortex Stiffness (after signalling)
     # ------------------------------------------------------------------
-    def update_cortex_stiffness(self):
+    def update_cortex_stiffness(self, dt):
         """
         Updates cortex stiffness from local RhoA.
         """
         # Compute mean RhoA of connecting nodes
         local_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
    
-        # Compute activation directly of RhoA level
-        rhoa_gain = self.mech.get('rhoa_gain', 4.0) 
-        rhoa_signal = rhoa_gain * max(local_rhoa, 0.0) 
+        # Compute activation directly of RhoA level 
+        rhoa_signal = float(np.clip(local_rhoa, 0.0, 1.0))
 
         # Instant stiffness update (operates on seconds timescale)
-        self.k_active = self.k_cortex + rhoa_signal # k_cortex as stiffness baseline
+        self.k_cortex = self.k_cortex_base + rhoa_signal * 2.0
+
+        a_target = self.a_cortex_base - rhoa_signal * self.a_cortex_range
+
+        rate = dt / self.mech.get('tau_remodel', 30)
+        self.a_cortex += rate * (a_target - self.a_cortex)
+        self.a_cortex = float(np.clip(self.a_cortex , 0.0, 1.0))
 
     # ------------------------------------------------------------------
     # Diagnostics
@@ -109,14 +125,15 @@ class Spring:
             'id': self.id,
             'side': self.side,
             'extension': round(self.L_current - self.L_cortex, 4),
-            'stiffness': round(self.k_active, 4),
+            'stiffness': round(self.k_cortex, 4),
             'tension': round(self.t_cortex, 4),
-            'alignment': round(self.alignment, 3)
+            'alignment': round(self.alignment, 3),
+            'activation': round(self.a_cortex, 3)
         }
 
     def __repr__(self):
         return (
             f"Spring(id={self.id} | side={self.side} | "
             f"L={self.L_current:.3f} L0={self.L_cortex:.3f} | "
-            f"k_active={self.k_active:.3f} | T={self.t_cortex:.4f})"
+            f"k_cortex={self.k_cortex:.3f} | T={self.t_cortex:.4f})"
         )

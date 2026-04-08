@@ -55,8 +55,8 @@ def measure_forces(cell):
     # --- Cortical tension ---
     pole_tension   = safe_mean([s.t_cortex for s in pole_springs])
     lat_tension    = safe_mean([s.t_cortex for s in lat_springs])
-    k_active_pole = safe_mean([s.k_active for s in pole_springs])
-    k_active_lat  = safe_mean([s.k_active for s in lat_springs])
+    k_active_pole = safe_mean([s.k_cortex for s in pole_springs])
+    k_active_lat  = safe_mean([s.k_cortex for s in lat_springs])
 
     # --- Stress fibre ---
     sf_tension = safe_mean(cell.stress_fibre.t_sf)
@@ -94,60 +94,3 @@ def measure_forces(cell):
         'area_pressure':     round(area_pressure, 4),
     }
 
-
-# ------------------------------------------------------------------
-# Cell info — structural summary for testing and reporting
-# ------------------------------------------------------------------
-def cell_info(cell):
-    """
-    Structural summary of cell topology and classification.
-
-    Returns dict with:
-        - Node counts by role
-        - Spring counts by side
-        - FA node IDs and positions
-        - SF cable endpoints and rest length
-        - Initial geometry (target area, rest length)
-    """
-    # Node classification
-    roles = {}
-    for n in cell.nodes:
-        roles.setdefault(n.role, []).append(n.id)
-
-    # Spring classification
-    sides = {}
-    for s in cell.springs:
-        sides.setdefault(s.side, []).append(s.id)
-
-    # FA info
-    fa_info = {}
-    for nid, pos in cell.fa_nodes.items():
-        fa_info[nid] = {
-            'initial_pos': pos.copy(),
-            'current_pos': cell.nodes[nid].pos.copy(),
-            'ratchet_pos': cell.fa_max_displacement[nid].copy(),
-            'role':        cell.nodes[nid].role,
-        }
-
-    # SF info
-    sf_info = []
-    for sf in cell.stress_fibres:
-        sf_info.append({
-            'upstream_node':   sf.node_upstream.id,
-            'downstream_node': sf.node_downstream.id,
-            'L_rest':          round(sf.L_rest, 3),
-            'L_current':       round(sf.L_current, 3),
-        })
-
-    return {
-        'n_nodes':        cell.n_nodes,
-        'nodes_by_role': {role: {'count': len(ids), 'ids': ids}
-                          for role, ids in roles.items()},
-        'n_springs':      len(cell.springs),
-        'springs_by_side': {side: {'count': len(ids), 'ids': ids}
-                           for side, ids in sides.items()},
-        'fa_nodes':       fa_info,
-        'stress_fibres':  sf_info,
-        'target_area':    round(cell.target_area, 2),
-        'rest_length':    round(cell.rest_length, 4),
-    }

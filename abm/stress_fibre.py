@@ -10,7 +10,7 @@
 # Activation (a_sf) from mean RhoC via first order lag. 
 
 import numpy as np
-from abm.mechanics import hookes_law
+from abm.mechanics import bilinear_tension
 from abm.geometry import perpendicular, project_onto_axis, axial_projection
 
 class StressFibre:
@@ -23,13 +23,17 @@ class StressFibre:
         self.node_down = node_down
         self.mech = cfg['mechanics']
 
-        # Stress fibre properties
-        self.L_sf = rest_length 
-        self.a_sf = 0.0 
-        self.t_sf = 0.0 # axial cable tension
-        self.nu_sf = self.mech.get('nu_sf', 0.3)
-        self.contract_frac = self.mech.get('sf_contract_fraction', 0.1)
+        
+        self.a_sf_range = self.mech.get('a_sf_range', 0.3)
+        self.a_sf_base = self.mech.get('a_sf_base', 0.81)
+        self.a_sf = self.a_sf_base
+
         self.k_sf = self.mech.get('k_sf_fraction', 0.7) * self.mech.get('k_cortex', 1.0)
+        self.nu_sf = self.mech.get('nu_sf', 0.3)
+
+        # Stress fibre properties
+        self.L_sf = rest_length #* self.a_sf
+        self.t_sf = 0.0 # axial cable tension
 
         # Geometry 
         self.L_current = 0.0
@@ -61,8 +65,11 @@ class StressFibre:
         self.cable_mid = 0.5 * (self.node_up.pos + self.node_down.pos)
 
         # --- Tension ---
-        self.t_sf = hookes_law(l=self.L_current, l0=self.L_sf, 
-                               k=self.k_sf) * self.a_sf
+        # self.t_sf = hookes_law(l=self.L_current, l0=self.L_sf * self.a_sf, 
+        #                        k=self.k_sf) 
+        self.t_sf = bilinear_tension(l=self.L_current, 
+                                     l0=self.L_sf * self.a_sf, 
+                                    k=self.k_sf) 
         
     # ------------------------------------------------------------------
     # 2. Load Accumulation
@@ -84,53 +91,58 @@ class StressFibre:
     # ------------------------------------------------------------------
 
     def apply_sf_forces(self, nodes, positions):
-        """Unified SF forces: Axial pull at poles, Parabolic squeeze at waist."""
+        """Unified SF forces: axial pull at poles, distributed parabolic squeeze at waist."""
+        # No squeeze if fibre is slack
         if self.t_sf < 1e-6:
             return
         
+    
         radius = self.L_current / 2
-
-        for node in nodes: 
-            proj = axial_projection(node.pos, self.cable_mid, self.axis_unit, radius)
-
-            # Axial Contraction
-            f_axial_mag = (proj**2) * self.t_sf * self.contract_frac
-            node.apply_force(-np.sign(proj) * f_axial_mag * self.axis_unit)
-
-            # squeeze
-            dx_vec = node.pos - self.cable_mid    
-            side_sign = np.sign(np.dot(dx_vec, self.perp_unit))        
-            f_sq_mag = (1-proj**2) * self.t_sf * self.nu_sf
-            node.apply_force(-side_sign * f_sq_mag * self.perp_unit)
         
-        # # Calculate half-length of the cell for normalization
-        # x_coords = [n.pos[0] for n in nodes]
-        # max_dx = (np.max(x_coords) - np.min(x_coords)) / 2
-        
-        # nu_sf = self.mech.get('nu_sf', 0.3) # Scaled squeeze ratio
+        # Axial coordinate along fibre, already normalized to [-1, 1] and clipped.
+        # p=0 at waist, |p|=1 at poles. Vectorizes naturally over (N, 2) input.
+        p = axial_projection(positions, self.cable_mid, self.axis_unit, radius)
 
-        # for node in nodes:
-        #     # Distance from center projected onto SF axis
-        #     dx_vec = node.pos - self.cable_mid
-        #     dx_mag = np.dot(dx_vec, self.axis_unit) 
-            
-        #     # Normalize distance (0 at center, 1 at poles)
-        #     dist_norm = min(abs(dx_mag) / max_dx, 1.0)
+        # Lateral coordinate (perpendicular to fibre): signed distance from axis.
+        # Sign encodes which side of the fibre each node sits on.
+        lateral = (positions - self.cable_mid) @ self.perp_unit
 
-        #     # AXIAL PULL
-        #     # weight_axial = dist_norm**2 
-        #     # f_axial = -np.sign(dx_mag) * self.t_sf * weight_axial * 0.1 # 0.1 contraction fraction
-        #     # node.apply_force(f_axial * self.axis_unit)
+        # --- Squeeze weights: axial × lateral profile ---
+        # Axial profile: parabolic, peaks at waist (p=0), zero at poles (|p|=1).
+        # Non-negative by construction since p ∈ [-1, 1].
+        axial_profile = 1.0 - p * p
 
-        #     # LATERAL SQUEEZE
-        #     # weight_sq = 1 - (dist_norm**2)
-            
-            # # Calculate which side of the SF the node is on
-            # side_sign = np.sign(np.dot(dx_vec, self.perp_unit))
-            
-            # # Apply inward force
-            # f_sq = -nu_sf * self.t_sf * side_sign * weight_sq * self.perp_unit
-            # node.apply_force(f_sq)
+        # Lateral profile: prefer flank nodes far from the axis. On-axis nodes
+        # (lateral≈0) correctly get zero weight — no meaningful direction to push.
+        lateral_profile = np.abs(lateral)
+
+        weights = axial_profile * lateral_profile
+
+        W = weights.sum()
+        if W < 1e-12:
+            return
+        weights /= W
+
+        # --- Force assembly ---
+        # Total squeeze force the fibre distributes across the waist (Poisson coupling).
+        F_total = self.t_sf * self.nu_sf
+
+        # Direction: inward along perp axis. sign(lateral) points outward from the
+        # fibre, so negate to push toward the axis. np.sign(0)=0 handles on-axis
+        # nodes safely (and those already have zero weight anyway).
+        f_mags = weights * F_total
+        directions = -np.sign(lateral)
+
+        # Assemble (N, 2) force vectors: scalar magnitudes × perp unit vector.
+        forces = (f_mags * directions)[:, None] * self.perp_unit
+
+        # --- Apply to nodes ---
+        # Python loop at the API boundary. If node.apply_force just accumulates into
+        # a field, consider a batched variant to keep this fully vectorized.
+        for node, f in zip(nodes, forces):
+            node.apply_force(f)
+
+   
 
     # ------------------------------------------------------------------
     # 3. Update Activation
@@ -141,12 +153,11 @@ class StressFibre:
         a_sf = clip(rhoc_gain × mean_rhoc, 0, 1)
         First-order lag with tau_remodel models SF assembly timescale.
         """
-        rhoc_gain = self.mech.get('rhoc_gain', 1.0)
-        rhoc_signal = rhoc_gain * max(mean_rhoc, 0.0)
-        a_target = float(np.clip(rhoc_signal, 0.0, 1.0))
-        
-        alpha = dt / self.mech.get('tau_remodel', 30)
-        self.a_sf += alpha * (a_target - self.a_sf)
+        rhoc_signal = float(np.clip(mean_rhoc, 0.0, 1.0))
+        a_target = self.a_sf_base - rhoc_signal * self.a_sf_range
+
+        rate = dt / self.mech.get('tau_remodel', 30)
+        self.a_sf += rate * (a_target - self.a_sf)
         self.a_sf = float(np.clip(self.a_sf, 0.0, 1.0))
 
     # ------------------------------------------------------------------

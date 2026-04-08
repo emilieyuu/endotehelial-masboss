@@ -294,7 +294,7 @@ class EndothelialCell:
             node.update_signalling()
 
         for s in self.springs:
-            s.update_cortex_stiffness()
+            s.update_cortex_stiffness(dt)
 
         self.stress_fibre.update_sf_activation(
             mean_rhoc=self.rhoc_mean, dt=dt
@@ -322,8 +322,8 @@ class EndothelialCell:
             'mean_rhoc': safe_mean([n.P_RhoC for n in self.nodes]),
             'a_sf': round(self.stress_fibre.a_sf, 3),
             'sf_tension': round(self.stress_fibre.t_sf, 3),
-            'k_active_pole': round(np.mean([s.k_active for s in polar]), 3) if polar else 0,
-            'k_active_flank': round(np.mean([s.k_active for s in flank]), 3) if flank else 0,
+            'k_pole': round(np.mean([s.k_cortex for s in polar]), 3) if polar else 0,
+            'k_flank': round(np.mean([s.k_cortex for s in flank]), 3) if flank else 0,
             'tensile_pole': safe_mean([n.tensile_load for n in self.nodes if n.role in ('upstream', 'downstream')]),
             'f_total': safe_mean([n.shear_total for n in self.nodes]),
         }

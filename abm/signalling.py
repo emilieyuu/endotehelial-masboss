@@ -6,7 +6,7 @@ from abm.mechanics import hill
 
 def get_protein_recruitment(cfg, tau, protein):
     """
-   Compute Hill-function recruitment for a junction protein.
+    Compute Hill-function recruitment for a junction protein.
     
     tau: mechanical input (f_normal for DSP/JCAD, f_total for TJP1)
     protein: 'DSP', 'TJP1', or 'JCAD'
@@ -23,4 +23,5 @@ def get_protein_recruitment(cfg, tau, protein):
     
     p_max = params.get('p_max', 0.67) 
     p_raw = hill(tau, K, n)
+    
     return p_raw * p_max
