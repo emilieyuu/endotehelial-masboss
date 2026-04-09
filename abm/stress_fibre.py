@@ -23,7 +23,7 @@ class StressFibre:
         self.a_sf = self.a_sf_base # Initiate at base
 
         # Stiffness
-        self.k_sf = self.mech.get('k_sf_fraction', 0.7) * self.mech.get('k_cortex', 1.0) # Fraction of cortex stiffness
+        self.k_sf = self.mech.get('k_sf_fraction', 0.7) * self.mech.get('k_cortex_base', 1.0) # Fraction of cortex stiffness
         self.kc_ratio = self.mech.get('kc_ratio', 0.1)
         self.nu_sf = self.mech.get('nu_sf', 0.3) # Poisson-coupling coefficient
 

@@ -12,7 +12,7 @@
 
 import numpy as np
 from abm.membrane_node import MembraneNode
-from abm.spring import Spring
+from abm.cortex_spring import CortexSpring
 from abm.stress_fibre import StressFibre
 from abm.analysis.cell_measurement import measure_forces, measure_shape
 from abm.geometry import project_onto_axis, axial_projection
@@ -36,7 +36,7 @@ class EndothelialCell:
         self.nodes = self._init_node_ring(centroid, n_nodes, radius, lut, cfg)
         self._classify_nodes()
         self.springs = self._init_springs(n_nodes, cfg)
-        self.stress_fibre = self._init_sf()
+        self.sf = self._init_sf()
         
         # Area conservation
         self.target_area = self._compute_area() # fixed
@@ -96,7 +96,7 @@ class EndothelialCell:
             n1 = self.nodes[i]
             n2 = self.nodes[(i + 1) % n_nodes]
             dist = np.linalg.norm(n2.pos - n1.pos)
-            s = Spring(spring_id=i, node_1=n1, node_2=n2, rest_length=dist, cfg=cfg)
+            s = CortexSpring(spring_id=i, node_1=n1, node_2=n2, rest_length=dist, cfg=cfg)
 
             springs.append(s)
 
@@ -271,9 +271,9 @@ class EndothelialCell:
             s.apply_cortex_forces()
 
         # 3. SF geometry and and forces
-        self.stress_fibre.update_sf_geometry_tension()
-        self.stress_fibre.accumulate_sf_loads(self.polar_nodes)
-        self.stress_fibre.apply_sf_forces(self.nodes, self.positions)
+        self.sf.update_sf_geometry_tension()
+        self.sf.accumulate_sf_loads(self.polar_nodes)
+        self.sf.apply_sf_forces(self.nodes, self.positions)
 
         # 8. Soft pressure (area conservation)
         self.current_area = self._compute_area()
@@ -294,7 +294,7 @@ class EndothelialCell:
         for s in self.springs:
             s.update_cortex_stiffness_and_activation(dt)
 
-        self.stress_fibre.update_sf_activation(
+        self.sf.update_sf_activation(
             mean_rhoc=self.rhoc_mean, dt=dt
         )
 
@@ -318,8 +318,8 @@ class EndothelialCell:
             'mean_rhoa_lat': safe_mean([n.P_RhoA for n in self.nodes if n.role == 'lateral']),
             'mean_rhoa': safe_mean([n.P_RhoA for n in self.nodes]),
             'mean_rhoc': safe_mean([n.P_RhoC for n in self.nodes]),
-            'a_sf': round(self.stress_fibre.a_sf, 3),
-            'sf_tension': round(self.stress_fibre.t_sf, 3),
+            'a_sf': round(self.sf.a_sf, 3),
+            'sf_tension': round(self.sf.t_sf, 3),
             'k_pole': round(np.mean([s.k_cortex for s in polar]), 3) if polar else 0,
             'k_flank': round(np.mean([s.k_cortex for s in flank]), 3) if flank else 0,
             'tensile_pole': safe_mean([n.tensile_load for n in self.nodes if n.role in ('upstream', 'downstream')]),

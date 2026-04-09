@@ -12,7 +12,7 @@
 import numpy as np
 from abm.mechanics import bilinear_tension
 
-class Spring:
+class CortexSpring:
     """
     Cortical junction between two adjacent membrane nodes.
     """
@@ -30,7 +30,7 @@ class Spring:
         self.a_cortex = self.a_cortex_base # Iniate at base
 
         # Stiffness
-        self.k_cortex_base = self.mech.get('k_cortex', 1.0) # Basal contractile stiffness
+        self.k_cortex_base = self.mech.get('k_cortex_base', 1.0) # Basal contractile stiffness
         self.k_cortex_range = self.mech.get('k_cortex_range', 1.0) # Stiffness increase capacity
         self.k_cortex = self.k_cortex_base # Initiate at base
         self.kc_ratio = self.mech.get('kc_ratio', 0.1) # Compressive stiffness 

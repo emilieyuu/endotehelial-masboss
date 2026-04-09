@@ -1,9 +1,36 @@
 # src/utils.py
+#
 from datetime import datetime
 from pathlib import Path
 import numpy as np
 
+# ------------------------------------------------------------------
+# Config Utils
+# ------------------------------------------------------------------
+def require(cfg, *keys):
+    """
+    Safely restrive a nested config value. 
+    Raises KeyError with a clear path if any key is missing. 
 
+    cfg: dictionary
+    keys: separated sequence of dict keys
+    """
+    value = cfg
+
+    # Traverse dictionary with keys
+    for i, key in enumerate(keys):
+        # Raise error if key is missing
+        if not isinstance(value, dict) or key not in value: 
+            path = '.'.join(keys[:i+1])
+            raise KeyError(f"Missing required config key: {path}")
+        # Index into dictionary
+        value = value[key]
+        
+    return value
+
+# ------------------------------------------------------------------
+# File Access Utils
+# ------------------------------------------------------------------
 def save_df_to_csv(df, out_dir, base_name, timestamp=False):
     """
     Save DataFrame to CSV.
