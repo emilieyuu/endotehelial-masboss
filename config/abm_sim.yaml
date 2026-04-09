@@ -64,7 +64,7 @@ hill_params:
 
 
 # -----------------------------------------------------------------------------
-# MECHANICS — Cortical springs, stress fibres, focal adhesions, area penalty
+# MECHANICS — Cortical springs, stress fibres, area penalty
 # -----------------------------------------------------------------------------
 mechanics:
   # --- Cortical spring ---
@@ -76,13 +76,13 @@ mechanics:
 
   # --- Stress fibre ---
   k_sf_fraction: 0.7 # From Jakob et al. 
-  nu_sf: 0.3 # From Deshpade et al. 
+  nu_sf: 0.3 # From Deshpade et al., Poisson-coupling coefficient
 
   a_sf_base: 1.0 # Baseline SF is relaxed, only activated on stimulus
   a_sf_range: 0.3 # Recruitment capacity – maximum additional SF contraction from RhoC
 
   # --- Compressive Stiffness ---
-  kc_ratio: 0.1 # From Jakob et al. 
+  kc_ratio: 0.1 # From Jakob et al.
 
   # --- remodelling ---
   tau_remodel: 30.0

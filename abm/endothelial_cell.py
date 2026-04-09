@@ -265,17 +265,15 @@ class EndothelialCell:
         # 2. Cortical spring geometry and forces
         for s in self.springs:
             s.update_cortex_geometry_tension(self.flow_axis)
-
         for s in self.springs:
             s.accumulate_cortex_loads()
-
         for s in self.springs:
             s.apply_cortex_forces()
 
         # 3. SF geometry and and forces
         self.stress_fibre.update_sf_geometry_tension()
-        self.stress_fibre.apply_sf_forces(self.nodes, self.positions)
         self.stress_fibre.accumulate_sf_loads(self.polar_nodes)
+        self.stress_fibre.apply_sf_forces(self.nodes, self.positions)
 
         # 8. Soft pressure (area conservation)
         self.current_area = self._compute_area()
@@ -294,7 +292,7 @@ class EndothelialCell:
             node.update_signalling()
 
         for s in self.springs:
-            s.update_cortex_stiffness(dt)
+            s.update_cortex_stiffness_and_activation(dt)
 
         self.stress_fibre.update_sf_activation(
             mean_rhoc=self.rhoc_mean, dt=dt

@@ -1,13 +1,6 @@
 # abm/stress_fibre.py
 #
 # Stress fibre cable connecting upstream and downstream pole nodes. 
-#
-# Two mechanical effects:
-#   1. Axial contraction — pulls poles nodes inward (distributed across pole nodes)
-#   2. Lateral squeeze — pushes flank nodes inward (Poisson coupling)
-#
-# Tensions from Hooke's Law (tensile only, slack in compression). 
-# Activation (a_sf) from mean RhoC via first order lag. 
 
 import numpy as np
 from abm.mechanics import bilinear_tension
@@ -23,19 +16,22 @@ class StressFibre:
         self.node_down = node_down
         self.mech = cfg['mechanics']
 
-        
-        self.a_sf_range = self.mech.get('a_sf_range', 0.3)
-        self.a_sf_base = self.mech.get('a_sf_base', 0.81)
-        self.a_sf = self.a_sf_base
+        # --- SF Porperties --- 
+        # Activation
+        self.a_sf_base = self.mech.get('a_sf_base', 1.0) # No pretension, relaxed at initiation
+        self.a_sf_range = self.mech.get('a_sf_range', 0.3) # Contraction recruitment capacity 
+        self.a_sf = self.a_sf_base # Initiate at base
 
-        self.k_sf = self.mech.get('k_sf_fraction', 0.7) * self.mech.get('k_cortex', 1.0)
-        self.nu_sf = self.mech.get('nu_sf', 0.3)
+        # Stiffness
+        self.k_sf = self.mech.get('k_sf_fraction', 0.7) * self.mech.get('k_cortex', 1.0) # Fraction of cortex stiffness
+        self.kc_ratio = self.mech.get('kc_ratio', 0.1)
+        self.nu_sf = self.mech.get('nu_sf', 0.3) # Poisson-coupling coefficient
 
-        # Stress fibre properties
-        self.L_sf = rest_length #* self.a_sf
+        # Rest length and tension
+        self.L_sf = rest_length 
         self.t_sf = 0.0 # axial cable tension
 
-        # Geometry 
+        # --- Geometry ---
         self.L_current = 0.0
         self.axis_unit = np.zeros(2)
         self.perp_unit = np.zeros(2)
@@ -47,8 +43,6 @@ class StressFibre:
     def update_sf_geometry_tension(self):
         """
         Recompute SF geometry an tension. 
-        Tension = k_sf × max(L - L0, 0) × a_sf.
-        Zero when slack (L <= L0) or inactive (a_sf ≈ 0).
         """
         # --- Geometry ---
         diff = self.node_down.pos - self.node_up.pos
@@ -65,11 +59,10 @@ class StressFibre:
         self.cable_mid = 0.5 * (self.node_up.pos + self.node_down.pos)
 
         # --- Tension ---
-        # self.t_sf = hookes_law(l=self.L_current, l0=self.L_sf * self.a_sf, 
-        #                        k=self.k_sf) 
-        self.t_sf = bilinear_tension(l=self.L_current, 
-                                     l0=self.L_sf * self.a_sf, 
-                                    k=self.k_sf) 
+        self.t_sf = bilinear_tension(
+            l=self.L_current, l0=self.L_sf * self.a_sf, 
+            k=self.k_sf, kc_ratio=self.kc_ratio
+        ) 
         
     # ------------------------------------------------------------------
     # 2. Load Accumulation
@@ -77,6 +70,9 @@ class StressFibre:
     def accumulate_sf_loads(self, polar_nodes):
         """
         Accumulate SF axial tension for junction loading. 
+
+        Axial SF tension used purely for loading, modelling tension
+        felt by cells at junctions despite net-zero mechanical force. 
         """
         radius = self.L_current / 2
 
@@ -84,19 +80,20 @@ class StressFibre:
             projection = axial_projection(node.pos, self.cable_mid, self.axis_unit, radius)
             weight = projection**2
             load = max(weight * self.t_sf, 0.0)
-            node.tensile_load += load
+            node.add_tensile_load(load)
 
     # ------------------------------------------------------------------
     # 3. Force Application
     # ------------------------------------------------------------------
 
     def apply_sf_forces(self, nodes, positions):
-        """Unified SF forces: axial pull at poles, distributed parabolic squeeze at waist."""
+        """
+        Apply Stress Fibre lateral squeeze force. 
+        """
         # No squeeze if fibre is slack
         if self.t_sf < 1e-6:
             return
         
-    
         radius = self.L_current / 2
         
         # Axial coordinate along fibre, already normalized to [-1, 1] and clipped.
@@ -143,19 +140,19 @@ class StressFibre:
             node.apply_force(f)
 
    
-
     # ------------------------------------------------------------------
     # 3. Update Activation
     # ------------------------------------------------------------------
     def update_sf_activation(self, mean_rhoc, dt):
         """
-        SF activation from mean RhoC.
-        a_sf = clip(rhoc_gain × mean_rhoc, 0, 1)
-        First-order lag with tau_remodel models SF assembly timescale.
+        SF activation from mean cell RhoC.
         """
+        # Compute RhoC signal from cell-wide mean RhoC
         rhoc_signal = float(np.clip(mean_rhoc, 0.0, 1.0))
-        a_target = self.a_sf_base - rhoc_signal * self.a_sf_range
 
+        # First-order relaxation activation update towards RhoC-dependent target
+        # Baseline 1.0, drops toward 0.70 at max RhoC
+        a_target = self.a_sf_base - (rhoc_signal * self.a_sf_range)
         rate = dt / self.mech.get('tau_remodel', 30)
         self.a_sf += rate * (a_target - self.a_sf)
         self.a_sf = float(np.clip(self.a_sf, 0.0, 1.0))

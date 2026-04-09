@@ -19,26 +19,31 @@ class Spring:
     def __init__(self, spring_id, node_1, node_2, rest_length, cfg):
 
         self.id = spring_id
-        self.node_1, self.node_2 = node_1, node_2
+        self.node_1 = node_1
+        self.node_2 = node_2
         self.mech = cfg['mechanics']
 
-        # Cortical properties
+        # --- Cortical properties ---
+        # Activation
         self.a_cortex_base = self.mech.get('a_cortex_base', 0.95) # Pretension
-        self.a_cortex_range = self.mech.get('a_cortex_range', 0.2)
+        self.a_cortex_range = self.mech.get('a_cortex_range', 0.2) # Contraction recruitment capacity
         self.a_cortex = self.a_cortex_base # Iniate at base
 
-        self.k_cortex_base = self.mech.get('k_cortex', 1.0) # Basal Contractile stiffness
-        self.k_cortex_range = self.mech.get('k_cortex_range', 1.0)
+        # Stiffness
+        self.k_cortex_base = self.mech.get('k_cortex', 1.0) # Basal contractile stiffness
+        self.k_cortex_range = self.mech.get('k_cortex_range', 1.0) # Stiffness increase capacity
         self.k_cortex = self.k_cortex_base # Initiate at base
         self.kc_ratio = self.mech.get('kc_ratio', 0.1) # Compressive stiffness 
 
+        # Rest Length and Tension
         self.L_cortex = rest_length 
         self.t_cortex = 0.0 
 
-        # Geometry
+        # --- Geometry ---
         self.L_current = rest_length # Current/Activated length
         self.unit_vec = np.zeros(2) # Unit vector difference between nodes
         self.alignment = 0.0 # cos angle to flow
+
         if self.node_1.role in ('upstream', 'downstream') or self.node_2.role in ('upstream', 'downstream'):
             self.side = 'polar'
         else: 
@@ -96,9 +101,9 @@ class Spring:
         self.node_2.apply_force(-force_vec)
 
     # ------------------------------------------------------------------
-    # 4. Update Cortex Stiffness (after signalling)
+    # 4. Update Cortex Stiffness and Activation (after signalling)
     # ------------------------------------------------------------------
-    def update_cortex_stiffness(self, dt):
+    def update_cortex_stiffness_and_activation(self, dt):
         """
         Updates cortex stiffness from local RhoA.
         """
