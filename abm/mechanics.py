@@ -16,21 +16,16 @@ def bilinear_tension(l, l0, k, kc_ratio=0.1):
         return k * extension 
     else:
         return k * kc_ratio * extension 
-    
-def hill(tau, K, n):
-    """
-    Hill activation function. 
-    Maps mechanical stimulus to protein recruitment probability. 
 
-    tau: stimulus magnitude
-    K: half-activation threshold
-    n: Hill coefficient (switch sharpness)
+def relax_toward(current, target, dt, tau): 
     """
-    # No recruitment under compression. 
-    if tau <= 0: 
-        return 0.0 
-    
-    return tau**n / (K**n + tau**n)
+    First order relaxation: (dx/dt = target - current) / tau
+
+    Use for first-order relaxation of contractility towards target. 
+    dt: model timestep
+    tau: time constant, determines how fast to move toward target
+    """
+    return current + (dt / tau) * (target - current)
 
     
     

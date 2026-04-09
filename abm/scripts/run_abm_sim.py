@@ -100,7 +100,7 @@ def run_abm_sim_single(cfg, lut, n_steps, perturbation = 'WT', plot=False):
 
     # Initiate lists to store results
     cell_rows = []
-    diagnostic_rows = []
+    #diagnostic_rows = []
     spring_dfs = []
 
     # Time loop
@@ -114,13 +114,13 @@ def run_abm_sim_single(cfg, lut, n_steps, perturbation = 'WT', plot=False):
             diags = cell.get_diagnostics()
 
             cell_rows.append({**exp_dict, **state})
-            diagnostic_rows.append({**exp_dict, **diags})
+            #diagnostic_rows.append({**exp_dict, **diags})
             spring_dfs.append(get_spring_states(cell, exp_dict))
 
     cell_df = pd.DataFrame(cell_rows)
-    diags_df = pd.DataFrame(diagnostic_rows)
+    #diags_df = pd.DataFrame(diagnostic_rows)
     spring_df = pd.concat(spring_dfs, ignore_index= True)
-    sf_state = cell.stress_fibre.get_state()
+    sf_state = cell.sf.get_state()
     print(sf_state)
     # Optionally plot cell at initiation
     if plot:
@@ -130,11 +130,11 @@ def run_abm_sim_single(cfg, lut, n_steps, perturbation = 'WT', plot=False):
         'perb': perturbation,
         'cell_df': cell_df,
         'spring_df': spring_df,
-        'diagnostics': diags_df,
+        #'diagnostics': diags_df,
         'cell_final': cell.get_state(),
         'diagnostics_final': cell.get_diagnostics(),
         'springs_final': get_spring_states(cell, {}),
-       'sf_final': cell.stress_fibre.get_state(),
+       'sf_final': cell.sf.get_state(),
         'cell': cell
     }
 
@@ -153,9 +153,9 @@ def run_abm_sim(cfg, lut, n_steps=None, result_dir=None, plot=False):
     n_steps = n_steps or cfg['sim']['n_steps']
 
     cell_histories = []
-    diag_histories = []
+    #diag_histories = []
     ss_rows = []
-    diag_rows = []
+    #diag_rows = []
 
     for name, perb, in perbs.items(): 
         print(f">>> INFO: Running abm simulation perturbation: {name} ({n_steps} steps).")
@@ -164,12 +164,12 @@ def run_abm_sim(cfg, lut, n_steps=None, result_dir=None, plot=False):
         result = run_abm_sim_single(perb_cfg, lut, n_steps, name, plot)
 
         cell_histories.append(result['cell_df'])
-        diag_histories.append(result['diagnostics'])
+        #diag_histories.append(result['diagnostics'])
 
         ss_state = result['cell_final']
 
         ss_rows.append({'perturbation': name, **result['cell_final']})
-        diag_rows.append({'perturbation': name, **result['diagnostics_final']})
+        #diag_rows.append({'perturbation': name, **result['diagnostics_final']})
 
         print(f"{name:<18} {result['cell_final']['ar']:>6.3f} {result['cell_final']['orientation']:>8.1f}° "
                 f"{result['cell_final']['a_sf']:>6.3f} ")
@@ -177,15 +177,15 @@ def run_abm_sim(cfg, lut, n_steps=None, result_dir=None, plot=False):
    # print(f">>> INFO: All perturbations completed successfully.")
 
     timeseries_df  = pd.concat(cell_histories,   ignore_index=True)
-    diagnostics_ts_df = pd.concat(diag_histories, ignore_index=True)
+    #diagnostics_ts_df = pd.concat(diag_histories, ignore_index=True)
     ss_df = pd.DataFrame(ss_rows)
-    diagnostics_ss_df = pd.DataFrame(diag_rows)
+    #diagnostics_ss_df = pd.DataFrame(diag_rows)
 
     if result_dir is not None:
         save_df_to_csv(timeseries_df, result_dir, "abm_timeseries", ts=True)
         save_df_to_csv(ss_df, result_dir, "abm_ss", ts=True)
-        save_df_to_csv(diagnostics_ts_df, result_dir, "abm_diagnostics_timeseries", ts=True)
-        save_df_to_csv(diagnostics_ss_df, result_dir, "abm_dianostics_ss", ts=True)
+       # save_df_to_csv(diagnostics_ts_df, result_dir, "abm_diagnostics_timeseries", ts=True)
+        # save_df_to_csv(diagnostics_ss_df, result_dir, "abm_dianostics_ss", ts=True)
         print(f">>> INFO: Results saved to {result_dir}")
 
-    return timeseries_df, ss_df, diagnostics_ts_df, diagnostics_ss_df
+    return timeseries_df, ss_df#, diagnostics_ts_df, diagnostics_ss_df

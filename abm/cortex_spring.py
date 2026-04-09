@@ -10,7 +10,8 @@
 #   5. Updates activation and stiffness based on mean RhoA from endpoint nodes
 
 import numpy as np
-from abm.mechanics import bilinear_tension
+from abm.mechanics import bilinear_tension, relax_toward
+from src.utils import require
 
 class CortexSpring:
     """
@@ -21,28 +22,30 @@ class CortexSpring:
         self.id = spring_id
         self.node_1 = node_1
         self.node_2 = node_2
-        self.mech = cfg['mechanics']
 
         # --- Cortical properties ---
+        mech = cfg['mechanics']
+
         # Activation
-        self.a_cortex_base = self.mech.get('a_cortex_base', 0.95) # Pretension
-        self.a_cortex_range = self.mech.get('a_cortex_range', 0.2) # Contraction recruitment capacity
-        self.a_cortex = self.a_cortex_base # Iniate at base
+        self.a_base = require(mech, 'a_cortex_base') # Pretension
+        self.a_range = require(mech, 'a_cortex_range') # Contraction recruitment capacity
+        self.a = self.a_base # Iniate at base
+        self.tau_remodel = require(mech, 'tau_remodel')
 
         # Stiffness
-        self.k_cortex_base = self.mech.get('k_cortex_base', 1.0) # Basal contractile stiffness
-        self.k_cortex_range = self.mech.get('k_cortex_range', 1.0) # Stiffness increase capacity
-        self.k_cortex = self.k_cortex_base # Initiate at base
-        self.kc_ratio = self.mech.get('kc_ratio', 0.1) # Compressive stiffness 
+        self.k_base = require(mech, 'k_cortex_base') # Basal contractile stiffness
+        self.k_range = require(mech, 'k_cortex_range') # Stiffness increase capacity
+        self.k = self.k_base # Initiate at base
+        self.kc_ratio = require(mech, 'kc_ratio') # Compressive stiffness 
 
         # Rest Length and Tension
-        self.L_cortex = rest_length 
-        self.t_cortex = 0.0 
+        self.L0 = rest_length 
+        self.T = 0.0 
 
         # --- Geometry ---
-        self.L_current = rest_length # Current/Activated length
+        self.L = rest_length # Current/Activated length
         self.unit_vec = np.zeros(2) # Unit vector difference between nodes
-        self.alignment = 0.0 # cos angle to flow
+        #self.alignment = 0.0 # cos angle to flow
 
         if self.node_1.role in ('upstream', 'downstream') or self.node_2.role in ('upstream', 'downstream'):
             self.side = 'polar'
@@ -52,7 +55,7 @@ class CortexSpring:
     # ------------------------------------------------------------------
     # 1. Update Geometry and Tension
     # ------------------------------------------------------------------
-    def update_cortex_geometry_tension(self, flow_direction):
+    def update_geometry_tension(self):
         """
         Recompute spring geometry and tensions from current node positions. 
         Uses k_active set by update_stiffness() at previous step. 
@@ -63,25 +66,24 @@ class CortexSpring:
         if length < 1e-10:
             return
         
-        self.L_current = length
+        self.L = length
         self.unit_vec = diff / length
-        self.alignment = abs(np.dot(self.unit_vec, flow_direction))
         
         # --- Tension ---
         # Bilinear tension using current k_active
-        self.t_cortex = bilinear_tension(
-            l=self.L_current, l0=self.L_cortex * self.a_cortex, 
-            k=self.k_cortex, kc_ratio=self.kc_ratio
+        self.T = bilinear_tension(
+            l=self.L, l0=self.L0 * self.a, 
+            k=self.k, kc_ratio=self.kc_ratio
         ) 
 
     # ------------------------------------------------------------------
     # 2. Load Accumulation
     # ------------------------------------------------------------------
-    def accumulate_cortex_loads(self):
+    def accumulate_loads(self):
         """
         Compute spring load contribution and add to endpoint nodes. 
         """
-        load = max(self.t_cortex, 0.0)  # tensile only
+        load = max(self.T, 0.0)  # tensile only
 
         self.node_1.add_tensile_load(load)
         self.node_2.add_tensile_load(load)
@@ -89,13 +91,13 @@ class CortexSpring:
     # ------------------------------------------------------------------
     # 3. Force Application
     # ------------------------------------------------------------------
-    def apply_cortex_forces(self):
+    def apply_forces(self):
         """
         Apply equal and opposite mechanical forces on connected nodes.
         Pulls nodes together in the tensile regime. 
         Pushes nodes apart in the compressive regime. 
         """
-        force_vec = self.t_cortex * self.unit_vec
+        force_vec = self.T * self.unit_vec
 
         self.node_1.apply_force(force_vec)
         self.node_2.apply_force(-force_vec)
@@ -103,7 +105,7 @@ class CortexSpring:
     # ------------------------------------------------------------------
     # 4. Update Cortex Stiffness and Activation (after signalling)
     # ------------------------------------------------------------------
-    def update_cortex_stiffness_and_activation(self, dt):
+    def update_stiffness_and_activation(self, dt):
         """
         Updates cortex stiffness from local RhoA.
         """
@@ -113,14 +115,18 @@ class CortexSpring:
 
         # Instant stiffness update (operates on seconds timescale)
         # Baseline 1.0, max 3.0 when RhoA is 1.0
-        self.k_cortex = self.k_cortex_base + (rhoa_signal * self.k_cortex_range)
+        self.k = self.k_base + (rhoa_signal * self.k_range)
 
         # First-order relaxation activation update towards RhoA-dependent target
         # Baseline 0.95, drops toward 0.75 at max RhoA
-        a_target = self.a_cortex_base - (rhoa_signal * self.a_cortex_range)
-        rate = dt / self.mech.get('tau_remodel', 30)
-        self.a_cortex += rate * (a_target - self.a_cortex)
-        self.a_cortex = float(np.clip(self.a_cortex , 0.0, 1.0))
+        a_target = self.a_base - (rhoa_signal * self.a_range)
+
+        self.a = relax_toward(
+            current=self.a, target=a_target, 
+            dt=dt, tau=self.tau_remodel
+        )
+
+        self.a = float(np.clip(self.a , 0.0, 1.0))
 
     # ------------------------------------------------------------------
     # Diagnostics
@@ -129,16 +135,16 @@ class CortexSpring:
         return {
             'id': self.id,
             'side': self.side,
-            'extension': round(self.L_current - self.L_cortex, 4),
-            'stiffness': round(self.k_cortex, 4),
-            'tension': round(self.t_cortex, 4),
-            'alignment': round(self.alignment, 3),
-            'activation': round(self.a_cortex, 3)
+            'extension': round(self.L - self.L0, 4),
+            'stiffness': round(self.k, 4),
+            'tension': round(self.T, 4),
+            'activation': round(self.a, 3), 
+            #'alignment': round(self.alignment, 3),
         }
 
     def __repr__(self):
         return (
             f"Spring(id={self.id} | side={self.side} | "
-            f"L={self.L_current:.3f} L0={self.L_cortex:.3f} | "
-            f"k_cortex={self.k_cortex:.3f} | T={self.t_cortex:.4f})"
+            f"L={self.L:.3f} L0={self.L0:.3f} | "
+            f"k={self.k:.3f} | a={self.a:.3f} | T={self.T:.4f})"
         )

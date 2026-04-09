@@ -15,7 +15,7 @@ from abm.membrane_node import MembraneNode
 from abm.cortex_spring import CortexSpring
 from abm.stress_fibre import StressFibre
 from abm.analysis.cell_measurement import measure_forces, measure_shape
-from abm.geometry import project_onto_axis, axial_projection
+from abm.geometry import axial_coord, axial_projection
 from src.utils import safe_mean
 
 class EndothelialCell:
@@ -107,10 +107,15 @@ class EndothelialCell:
         Initiate a single stress fibre cable along flow axis. 
         Connects most upstream and downstream nodes. 
         """
-        # Get nodes connecting stress fibre, and compute rest length
-        projections = self.positions @ self.flow_axis
-        up_id, dn_id = int(np.argmin(projections)), int(np.argmax(projections))
+        # Axial coordinate of every node along the flow axis, measured from centroid. 
+        projections = axial_coord(self.positions, self.centroid, self.flow_axis)
+
+        # Most-negative = upstream pole, most-positive = downstream.
+        up_id = int(np.argmin(projections))
+        dn_id = int(np.argmax(projections))
         up_node, dn_node = self.nodes[up_id], self.nodes[dn_id]
+
+        # Rest length of the fibre is the initial pole-to-pole distance.
         sf_dist = projections.max() - projections.min()
 
         return StressFibre(node_up=up_node, node_down=dn_node, 
@@ -262,18 +267,23 @@ class EndothelialCell:
         self._apply_shear_drag(flow_field.drag)
         self._update_signalling_load(flow_field.magnitude)
 
-        # 2. Cortical spring geometry and forces
+        # 2. Update Geometry and Tension
         for s in self.springs:
-            s.update_cortex_geometry_tension(self.flow_axis)
-        for s in self.springs:
-            s.accumulate_cortex_loads()
-        for s in self.springs:
-            s.apply_cortex_forces()
+            s.update_geometry_tension()
 
-        # 3. SF geometry and and forces
-        self.sf.update_sf_geometry_tension()
-        self.sf.accumulate_sf_loads(self.polar_nodes)
-        self.sf.apply_sf_forces(self.nodes, self.positions)
+        self.sf.update_geometry_tension()
+
+        # 3. Accumulate Tensile Loading
+        for s in self.springs:
+            s.accumulate_loads()
+
+        self.sf.accumulate_loads(self.polar_nodes)
+
+        # 4. Apply mechanical forces
+        for s in self.springs:
+            s.apply_forces()
+
+        self.sf.apply_forces(self.nodes, self.positions)
 
         # 8. Soft pressure (area conservation)
         self.current_area = self._compute_area()
@@ -291,10 +301,11 @@ class EndothelialCell:
         for node in self.nodes:
             node.update_signalling()
 
+        # 11. Update Cortex and SF properties from rhoa/rhoc
         for s in self.springs:
-            s.update_cortex_stiffness_and_activation(dt)
+            s.update_stiffness_and_activation(dt)
 
-        self.sf.update_sf_activation(
+        self.sf.update_activation(
             mean_rhoc=self.rhoc_mean, dt=dt
         )
 
@@ -306,7 +317,7 @@ class EndothelialCell:
     # ------------------------------------------------------------------
     def get_state(self):
         shape = measure_shape(self)
-        forces = measure_forces(self)
+        #forces = measure_forces(self)
         polar = [s for s in self.springs if s.side == 'polar']
         flank = [s for s in self.springs if s.side == 'flank']
         return {
@@ -318,10 +329,10 @@ class EndothelialCell:
             'mean_rhoa_lat': safe_mean([n.P_RhoA for n in self.nodes if n.role == 'lateral']),
             'mean_rhoa': safe_mean([n.P_RhoA for n in self.nodes]),
             'mean_rhoc': safe_mean([n.P_RhoC for n in self.nodes]),
-            'a_sf': round(self.sf.a_sf, 3),
-            'sf_tension': round(self.sf.t_sf, 3),
-            'k_pole': round(np.mean([s.k_cortex for s in polar]), 3) if polar else 0,
-            'k_flank': round(np.mean([s.k_cortex for s in flank]), 3) if flank else 0,
+            'a_sf': round(self.sf.a, 3),
+            'sf_tension': round(self.sf.T, 3),
+            'k_pole': round(np.mean([s.k for s in polar]), 3) if polar else 0,
+            'k_flank': round(np.mean([s.k for s in flank]), 3) if flank else 0,
             'tensile_pole': safe_mean([n.tensile_load for n in self.nodes if n.role in ('upstream', 'downstream')]),
             'f_total': safe_mean([n.shear_total for n in self.nodes]),
         }

@@ -2,7 +2,20 @@
 #
 # Signalling functions: map mechanical inputs to protein recruitment.
 
-from abm.mechanics import hill
+def hill(tau, K, n):
+    """
+    Hill activation function. 
+    Maps mechanical stimulus to protein recruitment probability. 
+
+    tau: stimulus magnitude
+    K: half-activation threshold
+    n: Hill coefficient (switch sharpness)
+    """
+    # No recruitment under compression. 
+    if tau <= 0: 
+        return 0.0 
+    
+    return tau**n / (K**n + tau**n)
 
 def get_protein_recruitment(cfg, tau, protein):
     """
