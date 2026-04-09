@@ -133,6 +133,18 @@ class EndothelialCell:
         return self.positions.mean(axis=0)
     
     @property
+    def axial_half_extent(self):
+        """
+        Current half-length of the cell along the flow axis.
+
+        Used to normalise axial node positions into a dimensionless
+        [-1, 1] range for soft polarity weighting. 
+        Computed from the current (deformed) geometry.
+        """
+        axial = axial_coord(self.positions, self.centroid, self.flow_axis)
+        return float(np.max(np.abs(axial)))
+        
+    @property
     def polar_nodes(self):
         return [n for n in self. nodes if n.role in ("upstream", "downstream")]
 
@@ -184,29 +196,46 @@ class EndothelialCell:
     # ------------------------------------------------------------------
     # Forces
     # ------------------------------------------------------------------
-    def _apply_shear_drag(self, drag):
+    def _apply_shear_drag(self, flow):
         """
-        Shear stress effects:
+        Apply shear drag as an extensional force concentrated at the poles.
+        """
+        # p_ref = self.axial_half_extent
+        # if p_ref < 1e-10:
+        #     return
+        
+        # Axial coordinate of every node, signed relative to the centroid.
+        axial = axial_coord(self.positions, self.centroid, self.flow_axis)
+        p_ref = float(np.max(np.abs(axial)))
+        if p_ref < 1e-10:
+            return
+        p = axial / p_ref
 
-        Mechanical: extensional drag at pole nodes.
-                    Base drag from fluid shear + amplification from SF tension.
-                    SF tension amplification represents neighbour cell pulling
-                    through junctions — stronger SF → neighbours resist more
-                    → more outward force at poles.
-        """
-        centroid = self.centroid
-        for node in self.polar_nodes: 
-            drag_force = drag
-            axial_sign = np.sign(np.dot(node.pos - centroid, self.flow_axis))
-            node.apply_force(drag_force * axial_sign * self.flow_axis)
+        # Quadratic weight: sharp concentration at poles, zero at waist.
+        weights = p * p
+
+        # Apply drag per-node along the flow axis, with sign giving direction:
+        # upstream nodes (axial < 0) get pushed further upstream,
+        # downstream nodes (axial > 0) get pushed further downstream.
+        for node, w, a in zip(self.nodes, weights, axial):
+            force = flow.drag_on_node(weight=w, axial_sign=np.sign(a))
+            #print(node.id, force)
+            node.apply_force(force)
+
+        # centroid = self.centroid
+        # for node in self.polar_nodes: 
+        #     drag_force = drag
+        #     axial_sign = np.sign(np.dot(node.pos - centroid, self.flow_axis))
+        #     node.apply_force(drag_force * axial_sign * self.flow_axis)
        
-    def _update_signalling_load(self, shear):
+    def _update_signalling_load(self, flow):
         """
         Update tensile and total loads for protein recruitment
         """
+        stimulus = flow.shear_stimulus()
         for node in self.nodes: 
-            node.shear_total = max(shear, 0.0)
-            node.tensile_load += max(shear, 0.0)
+            node.shear_total = stimulus
+            node.tensile_load += stimulus
 
     def _apply_pressure(self):
         """
@@ -264,8 +293,8 @@ class EndothelialCell:
 
         # -- Force Accumulation --
         # 1. Uniform shear on all nodes
-        self._apply_shear_drag(flow_field.drag)
-        self._update_signalling_load(flow_field.magnitude)
+        self._apply_shear_drag(flow_field)
+        self._update_signalling_load(flow_field)
 
         # 2. Update Geometry and Tension
         for s in self.springs:

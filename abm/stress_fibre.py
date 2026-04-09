@@ -99,66 +99,44 @@ class StressFibre:
     # ------------------------------------------------------------------
     def apply_forces(self, nodes, positions):
         """
-        Apply SF lateral squeeze  to membrane nodes.
+        Apply SF lateral squeeze – inward at waist, zero at poles. 
 
-        Lateral SF contraction applied net-zero force due to "neighbouring cell forces"
-        Poisson couplic converts a fraction of axial tension into inwars lateral squeeze. 
+        Lateral SF contraction applied net-zero force due to 
+        "neighbouring cell forces".
 
-        The distribution uses a separable weight:
-            w(node) = axial_profile(p) × lateral_profile(lateral)
-        where:
-            axial_profile = 1 - p² (parabolic, peaks at waist, zero at poles)
-            lateral_profile = |lateral| (prefer nodes far from the fibre axis)
+        Poisson coupling converts a fraction of axial tension into 
+        inwards lateral squeeze. 
 
-        Weights are normalised so total squeeze force is mesh-independent:
-            sum(|f_node|) = T × nu_sf
-            """
-        # No squeeze if fibre is slack
+        Distribution is parabolic in axial coordinate. Each node pushed 
+        toward SF axis. 
+        """
         if self.T < 1e-6:
             return
         
-        # Recompute perpendicular axis locally.
-        perp_unit = perpendicular(self.axis_unit)
-        
-        # --- Coordinates of nodes relative to fibre ---
-        # Axial: Normalised to [-1, 1]: 0 at waist, ±1 at poles.
+        # Normalised axial coord, parabolic profile peaks at waist
         half_L = self.L / 2
-        axial = axial_coord(positions, self.cable_mid, self.axis_unit) 
-        p = axial / half_L
+        p = axial_coord(positions, self.cable_mid, self.axis_unit) / half_L
+        axial_profile = np.maximum(1.0 - p * p, 0.0)
 
-        # Lateral: raw distance perpendicular to the fibre axis.
-        # Sign encodes which side of the fibre each node sits on.
-        lateral = lateral_coord(positions, self.cable_mid, self.axis_unit)
-
-        # --- Weight profile ---
-        # Parabolic axial profile: maximum squeeze at the waist (p=0),
-        axial_profile = 1.0 - p * p
-
-        # Lateral profile: nodes on the axis (lateral ≈ 0) get zero weight
-        # Flank nodes furthest from the axis get the most squeeze.
-        lateral_profile = np.abs(lateral)
-
-        weights = axial_profile * lateral_profile
-
-        # Normalise so the sum equals 1, makes the total squeeze force independent of node count.
-        W = weights.sum()
-        if W < 1e-12:
+        # Normalise weights so total squeeze = T × nu_sf
+        total = axial_profile.sum()
+        if total < 1e-12:
             return
-        weights /= W
+        weights = axial_profile / total
 
-        # --- Total squeeze force ---
         F_total = self.T * self.nu_sf
 
-        # Direction: push each node toward the axis
-        f_mags = weights * F_total
-        directions = -np.sign(lateral)
+        # Direction: inward along the vector from each node to the fibre midpoint.
+        # Lateral coordinated projected onto perpendicular axis for sign.
+        lateral = lateral_coord(positions, self.cable_mid, self.axis_unit)
+        perp_unit = perpendicular(self.axis_unit)
 
-        # Assemble (N, 2) force vectors along perp_unit.
-        forces = (f_mags * directions)[:, None] * perp_unit
-
-        # Apply to nodes
-        for node, f in zip(nodes, forces):
-            node.apply_force(f)
+        # Each node's force points along -sign(lateral) * perp_unit,
+        for node, w, lat in zip(nodes, weights, lateral):
+            if abs(lat) < 1e-10:
+                continue   # on-axis node, no direction to push
+            direction = -np.sign(lat) * perp_unit
+            node.apply_force(w * F_total * direction)
 
    
     # ------------------------------------------------------------------

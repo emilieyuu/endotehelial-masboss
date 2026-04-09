@@ -26,12 +26,19 @@ class FlowField:
         self.direction = direction / norm
         print(f">>> INFO: Initiated flow field with magnitude {self.magnitude} and unit direction {self.direction}")
 
-    def get_drag_force(self):
-        return self.drag
     
-    def get_magnitude(self):
-        return self.magnitude
+    def drag_on_node(self, weight, axial_sign):
+        """
+        Compute drag force on a single node given polarity weight and axial sign. 
+        Flow provides magnitude and direction
+        """
+        return weight * self.drag * axial_sign * self.direction
     
+    def shear_stimulus(self):
+        """
+        Scalar shear magnitude felt uniformly by any node under flow. 
+        """
+        return max(self.magnitude, 0.0)
 
     def __repr__(self):
         return (
