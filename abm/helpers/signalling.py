@@ -1,6 +1,7 @@
-# abm/signalling.py
+# abm/helpers/signalling.py
 #
 # Signalling functions: map mechanical inputs to protein recruitment.
+from src.utils import require
 
 def hill(tau, K, n):
     """
@@ -21,19 +22,17 @@ def get_protein_recruitment(cfg, tau, protein):
     """
     Compute Hill-function recruitment for a junction protein.
     
-    tau: mechanical input (f_normal for DSP/JCAD, f_total for TJP1)
+    tau: mechanical stimulus magnitude (tensile for DSP, shear for TJP1/JCAD)
     protein: 'DSP', 'TJP1', or 'JCAD'
-    Returns: recruitment level in [0, p_max]
+    Returns: recruitment level in [0, p_max], or 0.0 if the protein is knocked out
     """
-    params = cfg['hill_params'][protein]
+    params = require(cfg, 'hill_params', protein)
 
     if params.get('knocked_out', False):
-        return 0.0 # No recruitment if protein is knocked out.
+        return 0.0 # KO: clamp recruitment to zero
 
-    K = params.get('K', 5)
-    n = params.get('n', 2)
-    
-    p_max = params.get('p_max', 0.67) 
-    p_raw = hill(tau, K, n)
+    K = require(params, 'K')
+    n = require(params, 'n')
+    p_max = require(params, 'p_max')
 
-    return p_raw * p_max
+    return hill(tau, K, n) * p_max

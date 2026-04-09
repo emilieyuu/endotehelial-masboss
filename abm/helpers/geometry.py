@@ -1,4 +1,4 @@
-# abm/geometry.py
+# abm/helpers/geometry.py
 #
 # Pure geometric helpers. 
 # Function take raw arrays and return raw arrays. 
@@ -13,7 +13,7 @@ def axial_coord(points, origin, axis):
 
     points: (2,) or (N, 2) – point(s) to project
     origin: (2,) – reference point (projecton relative to this)
-    axis: (2,) – firection vector, normalised internally
+    axis: (2,) – direction vector, normalised internally
 
     Returns : float if a single point was passed, else (N,) array
     """
@@ -47,8 +47,7 @@ def lateral_coord(points, origin, axis):
 
 def perpendicular(vec):
     """
-    2D perpendicular (90° CCW rotation) of a vector.
-    Used to build the lateral axis from the flow axis.
+    2D perpendicular vector – rotates input counter-clockwise
     """
     return np.array([-vec[1], vec[0]])
 
