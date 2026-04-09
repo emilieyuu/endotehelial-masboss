@@ -11,100 +11,75 @@ files:
   recruitment_csv: "param_sweep_Joint_Recr_Sweep.csv"
 
 # -----------------------------------------------------------------------------
-# INTEGRATION 
+# SIMULATION — Time integration scheme and run length
 # -----------------------------------------------------------------------------
 # Overdamped equation: dx = (F_net / gamma) × dt
-# All forces are in pN, lengths in µm, times in minutes.
-
-integration:
+# Units: lengths in µm, times in minutes, forces in nN.
+simulation:
   dt: 0.1
-  gamma: 3.0
-  max_displacement: 0.5
   n_steps: 1500
+  gamma: 3.0 # viscous drag coefficient (overdamped friction)
+  max_displacement: 0.5 # per-step displacement clamp (numerical stability)
 
 # -----------------------------------------------------------------------------
-# CELL GEOMETRY — Initial cell shape and discretisation
+# CELL — Initial geometry and discretisation
 # -----------------------------------------------------------------------------
-cell_geometry:
+cell:
   n_nodes: 16
-  radius: 12.0
-  init_ar: 1.0
-  polar_threshold: 30
-
+  radius: 12.0 # initial cell radius (µm)
+  centroid: [0.0, 0.0] # initial centroid position
+  polar_angle: 30 # half-cone angle (degrees) defining polar nodes
+  p_area: 0.5 # area-conservation pressure coefficient
 
 # -----------------------------------------------------------------------------
-# FLOW — External shear stress input
+# FLOW — External shear stress 
 # -----------------------------------------------------------------------------
 flow:
   f_magnitude: 10.0
   f_direction: [1.0, 0.0]
-  f_drag_fraction: 0.1 # sweep
+  f_drag_fraction: 0.1 # fraction of flow magnitude transmitted as drag
+
+# -----------------------------------------------------------------------------
+# CORTEX — Cortical spring properties
+# -----------------------------------------------------------------------------
+cortex:
+  k_base: 1.0 # baseline stiffness (nN/µm)
+  k_range: 1.0 # RhoA-driven stiffness increase capacity
+  a_base: 0.95 # baseline activation (rest length fraction)
+  a_range: 0.15 # RhoA-driven activation decrease capacity
+
+# -----------------------------------------------------------------------------
+# STRESS FIBRE — Cable properties
+# -----------------------------------------------------------------------------
+stress_fibre:
+  k_fraction: 0.7 # SF stiffness as fraction of cortex k_base
+  a_base: 1.0  # baseline (relaxed at quiescence)
+  a_range: 0.25  # RhoC-driven activation decrease capacity
+  nu: 0.3 # Poisson coupling for waist squeeze
+
+# -----------------------------------------------------------------------------
+# SHARED MECHANICS — Cross-cutting mechanical parameters
+# -----------------------------------------------------------------------------
+mechanics:
+  kc_ratio: 0.1 # compression/tension stiffness ratio (bilinear law)
+  tau_remodel: 30.0 # first-order relaxation timescale (min)
 
 # -----------------------------------------------------------------------------
 # SIGNALLING — Hill function parameters for junction protein recruitment
 # -----------------------------------------------------------------------------
 hill_params:
-  DSP:
-    K: 15 #
-    n: 3 # 
-    p_max: 0.67 # MaBoSS LUT ceiling — fixed
-    knocked_out: false   # set true for DSP_KO perturbation
-
-  TJP1:
-    K: 8 #5 # f_magnitude/6
-    n: 2 # low cooperativity — total shear sensor
-    p_max: 0.67 # MaBoSS LUT ceiling — fixed
-    knocked_out: false
-
-  JCAD:
-    K: 4 #3
-    n: 2 # high cooperativity — sharp pole amplifier
-    p_max: 0.67         # MaBoSS LUT ceiling — fixed
-    knocked_out: false
+  DSP:  {K: 15, n: 3, p_max: 0.67, knocked_out: false}
+  TJP1: {K: 8,  n: 2, p_max: 0.67, knocked_out: false}
+  JCAD: {K: 4,  n: 2, p_max: 0.67, knocked_out: false}
 
 
 # -----------------------------------------------------------------------------
-# MECHANICS — Cortical springs, stress fibres, area penalty
+# PERTURBATIONS 
 # -----------------------------------------------------------------------------
-mechanics:
-  # --- Cortical spring ---
-  k_cortex_base: 1.0 # Baseline for all other stiffness
-  k_cortex_range: 1.0
-
-  a_cortex_base: 0.95 # From Jakob et al., Baseline cortex contraction at homeostasis
-  a_cortex_range: 0.15 # Recruitment capacity – maximum additional conrtex contraction from RhoA
-
-  # --- Stress fibre ---
-  k_sf_fraction: 0.7 # From Jakob et al. 
-  nu_sf: 0.3 # From Deshpade et al., Poisson-coupling coefficient
-
-  a_sf_base: 1.0 # Baseline SF is relaxed, only activated on stimulus
-  a_sf_range: 0.25 # Recruitment capacity – maximum additional SF contraction from RhoC
-
-  # --- Compressive Stiffness ---
-  kc_ratio: 0.1 # From Jakob et al.
-
-  # --- remodelling ---
-  tau_remodel: 30.0
-
-  # --- Area conservation ---
-  k_area: 0.5
-
-# -----------------------------------------------------------------------------
-# PERTURBATIONS — Knockout conditions
-# -----------------------------------------------------------------------------
-
 perturbations:
   WT: {}
-  DSP_KO:
-    DSP: {knocked_out: true}
-  TJP1_KO:
-    TJP1: {knocked_out: true}
-  JCAD_KO:
-    JCAD: {knocked_out: true}
-  DSP_JCAD_DKO:
-    DSP: {knocked_out: true}
-    JCAD: {knocked_out: true}
-  TJP1_JCAD_DKO:
-    TJP1: {knocked_out: true}
-    JCAD: {knocked_out: true}
+  DSP_KO:        {DSP:  {knocked_out: true}}
+  TJP1_KO:       {TJP1: {knocked_out: true}}
+  JCAD_KO:       {JCAD: {knocked_out: true}}
+  DSP_JCAD_DKO:  {DSP:  {knocked_out: true}, JCAD: {knocked_out: true}}
+  TJP1_JCAD_DKO: {TJP1: {knocked_out: true}, JCAD: {knocked_out: true}}

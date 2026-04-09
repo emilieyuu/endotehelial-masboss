@@ -2,60 +2,62 @@
 #
 # Cortical spring between adjacent membrane nodes. 
 # 
-# Responsibilities: 
-#   1. Holds state (rest length, stiffness, activation, side, alignment)
-#   2. Computes bilinear tension from current geometry
-#   3. Applies equal-and-opposite forces on endpoint nodes
-#   4. Adds tension to tensile load accumulator
-#   5. Updates activation and stiffness based on mean RhoA from endpoint nodes
+# Cortex springs form a ring that discretises the cell cortex;
+# their combined tension resists deformation and their stiffness tracks
+# local RhoA activation at each endpoint.
 
 import numpy as np
-from abm.mechanics import bilinear_tension, relax_toward
+from abm.helpers.mechanics import bilinear_tension, relax_toward
 from src.utils import require
 
 class CortexSpring:
     """
     Cortical junction between two adjacent membrane nodes.
+
+    State:
+      L0, L — rest length and current length
+      k — current stiffness (RhoA-dependent)
+      a - current activation (RhoA-dependent, relaxed toward target)
+      T — current bilinear tension from (L, L0 × a, k)
+      unit_vec — unit direction from node_1 to node_2
     """
-    def __init__(self, spring_id, node_1, node_2, rest_length, cfg):
-        self.id = spring_id
+    def __init__(self, id, node_1, node_2, rest_length, cfg):
+        self.id = id
         self.node_1 = node_1
         self.node_2 = node_2
 
-        # --- Cortical properties ---
-        mech = cfg['mechanics']
+        # --- Config-derived parameters ---
+        cortex_cfg = require(cfg, 'cortex')
 
-        # Activation
-        self.a_base = require(mech, 'a_cortex_base') # Pretension
-        self.a_range = require(mech, 'a_cortex_range') # Contraction recruitment capacity
-        self.a = self.a_base # Iniate at base
-        self.tau_remodel = require(mech, 'tau_remodel')
+        # Activation: baseline pretension + RhoA-driven contraction capacity.
+        self.a_base = require(cortex_cfg, 'a_base') 
+        self.a_range = require(cortex_cfg, 'a_range') 
+        self.a = self.a_base # start at baseline       
 
-        # Stiffness
-        self.k_base = require(mech, 'k_cortex_base') # Basal contractile stiffness
-        self.k_range = require(mech, 'k_cortex_range') # Stiffness increase capacity
-        self.k = self.k_base # Initiate at base
-        self.kc_ratio = require(mech, 'kc_ratio') # Compressive stiffness 
+        # Stiffness: baseline + RhoA-driven stiffening capacity.
+        self.k_base = require(cortex_cfg, 'k_base')
+        self.k_range = require(cortex_cfg, 'k_range') 
+        self.k = self.k_base # start at baseline
 
-        # Rest Length and Tension
+        # Shared mechanical paramters
+        self.kc_ratio = require(cfg, 'mechanics', 'kc_ratio') # compression : tension stiffness
+        self.tau_remodel = require(cfg, 'mechanics', 'tau_remodel')
+
+        # --- Mechanical state ---
         self.L0 = rest_length 
+        self.L = rest_length 
         self.T = 0.0 
-
-        # --- Geometry ---
-        self.L = rest_length # Current/Activated length
-        self.unit_vec = np.zeros(2) # Unit vector difference between nodes
+        self.unit_vec = np.zeros(2)
 
     # ------------------------------------------------------------------
-    # 1. Update Geometry and Tension
+    # 1. Geometry and tension (called each step before force application)
     # ------------------------------------------------------------------
     def update_geometry_tension(self):
-        """
-        Recompute spring geometry and tensions from current node positions. 
-        Uses k_active set by update_stiffness() at previous step. 
-        """
+        """Recompute L, unit_vec, and T from current node positions."""
         # --- Geometry ---
         diff = self.node_2.pos - self.node_1.pos
         length = np.linalg.norm(diff)
+
         if length < 1e-10:
             return
         
@@ -63,63 +65,64 @@ class CortexSpring:
         self.unit_vec = diff / length
         
         # --- Tension ---
-        # Bilinear tension using current k_active
+        # Tension uses the bilinear law with effective rest length L0 × a.
+        # Stiffness k set from previous step.
         self.T = bilinear_tension(
             l=self.L, l0=self.L0 * self.a, 
             k=self.k, kc_ratio=self.kc_ratio
         ) 
 
     # ------------------------------------------------------------------
-    # 2. Load Accumulation
+    # 2. Load contribution (tensile-only stimulus to both endpoints)
     # ------------------------------------------------------------------
     def accumulate_loads(self):
-        """
-        Compute spring load contribution and add to endpoint nodes. 
-        """
-        load = max(self.T, 0.0)  # tensile only
-
+        """Contribute tensile stimulus to endpoint nodes."""
+        load = max(self.T, 0.0)  # no load in compression
         self.node_1.add_tensile_load(load)
         self.node_2.add_tensile_load(load)
 
     # ------------------------------------------------------------------
-    # 3. Force Application
+    # 3. Force application (equal and opposite along the spring axis)
     # ------------------------------------------------------------------
     def apply_forces(self):
         """
-        Apply equal and opposite mechanical forces on connected nodes.
-        Pulls nodes together in the tensile regime. 
-        Pushes nodes apart in the compressive regime. 
+        Apply ±T × unit_vec to the endpoints.
+
+        Positive T pulls the endpoints together (tensile regime);
+        negative T pushes them apart (compressive regime).
         """
         force_vec = self.T * self.unit_vec
-
         self.node_1.apply_force(force_vec)
         self.node_2.apply_force(-force_vec)
 
     # ------------------------------------------------------------------
-    # 4. Update Cortex Stiffness and Activation (after signalling)
+    # 4. Remodelling (called each step after signalling)
     # ------------------------------------------------------------------
     def update_stiffness_and_activation(self, dt):
         """
-        Updates cortex stiffness from local RhoA.
+        Update stiffness (instantaneous) and activation (relaxed) from
+        mean RhoA endpoint nodes.
+     
+        RhoA drives stiffness upward: k = k_base + rhoa × k_range (fast), 
+            baseline 1.0, max 3.0 when RhoA is 1.0
+        RhoA drives activation downward: a → a_base − rhoa × a_range (slow),
+            baseline 0.95, drops toward 0.75 at max RhoA
+
+        The fast/slow split reflects the physical separation between
+        motor engagement (seconds) and cytoskeletal turnover (minutes).
         """
-        # Compute RhoA signal as of connecting nodes
-        local_rhoa = 0.5 * (self.node_1.P_RhoA + self.node_2.P_RhoA)
-        rhoa_signal = float(np.clip(local_rhoa, 0.0, 1.0))
+        # Mean endpoint RhoA.
+        mean_rhoa = 0.5 * (self.node_1.rhoa + self.node_2.rhoa)
 
-        # Instant stiffness update (operates on seconds timescale)
-        # Baseline 1.0, max 3.0 when RhoA is 1.0
-        self.k = self.k_base + (rhoa_signal * self.k_range)
+        # Instant stiffness update
+        self.k = self.k_base + (mean_rhoa * self.k_range)
 
-        # First-order relaxation activation update towards RhoA-dependent target
-        # Baseline 0.95, drops toward 0.75 at max RhoA
-        a_target = self.a_base - (rhoa_signal * self.a_range)
-
+        # First-order relaxation towards RhoA-dependent target activation
+        a_target = self.a_base - (mean_rhoa * self.a_range)
         self.a = relax_toward(
             current=self.a, target=a_target, 
             dt=dt, tau=self.tau_remodel
         )
-
-        self.a = float(np.clip(self.a , 0.0, 1.0))
 
     # ------------------------------------------------------------------
     # Diagnostics
@@ -135,7 +138,6 @@ class CortexSpring:
 
     def __repr__(self):
         return (
-            f"Spring(id={self.id} | "
-            f"L={self.L:.3f} L0={self.L0:.3f} | "
+            f"Spring(id={self.id} | L={self.L:.3f} L0={self.L0:.3f} | "
             f"k={self.k:.3f} | a={self.a:.3f} | T={self.T:.4f})"
         )

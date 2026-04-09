@@ -1,51 +1,59 @@
 # abm/stress_fibre.py
 #
-# Stress fibre cable connecting upstream and downstream pole nodes. 
+# A single contractile stress fibre spanning the cell along the flow axis. 
+# 
+# Models the central actin bundle that forms during flow exposure: 
+# it connects the upstream and downstream polar nodes,
+# loads polar junctions axially, and squeezes the waist laterally.
 
 import numpy as np
-from abm.mechanics import bilinear_tension, relax_toward
+from abm.helpers.mechanics import bilinear_tension, relax_toward
+from abm.helpers.geometry import axial_coord, lateral_coord, perpendicular
 from src.utils import require
-from abm.geometry import axial_coord, lateral_coord, perpendicular
 
 class StressFibre:
     """
-    Contractile stress fibre cable along flow axis, connects upstream and downstream poles. 
+    Contractile stress fibre cable along flow axis, 
+    connects upstream and downstream poles. 
     """
 
-    def __init__(self, node_up, node_down, rest_length, cfg):
+    def __init__(self, node_up, node_down, nodes, rest_length, cfg):
         self.node_up = node_up
         self.node_down = node_down
+        self.nodes = nodes
 
-        # --- SF Porperties --- 
-        mech = cfg['mechanics']
-        self.tau_remodel = require(mech, 'tau_remodel')
+        # --- Config-derived parameters ---
+        sf_cfg = require(cfg, 'stress_fibre')
 
-        # Activation
-        self.a_base = require(mech, 'a_sf_base')# No pretension, relaxed at initiation
-        self.a_range = require(mech, 'a_sf_range') # Contraction recruitment capacity 
-        self.a = self.a_base # Initiate at base
+        # Activation: quiescent baseline + RhoC-driven contraction capacity
+        self.a_base = require(sf_cfg, 'a_base')
+        self.a_range = require(sf_cfg, 'a_range')
+        self.a = self.a_base # start at baselien
 
-        # Stiffness
-        self.k = require(mech, 'k_sf_fraction') * require(mech, 'k_cortex_base') # Fraction of cortex stiffness
-        self.kc_ratio = require(mech, 'kc_ratio')
-        self.nu_sf = require(mech, 'nu_sf') # Poisson-coupling coefficient
+        # Stiffness: fixed at init, scaled down from cortex
+        self.k = require(sf_cfg, 'k_fraction') * require(cfg, 'cortex', 'k_base') 
 
-        # Rest length and tension
-        self.L0 = rest_length 
-        self.T = 0.0 # axial cable tension
+        # Poisson coupling coefficient: fraction of axial tension
+        self.nu = require(sf_cfg, 'nu')
 
-        # --- Geometry ---
-        self.L = rest_length
+        # Shared mechanical paramters
+        self.kc_ratio = require(cfg, 'mechanics', 'kc_ratio') # compression : tension stiffness
+        self.tau_remodel = require(cfg, 'mechanics', 'tau_remodel')
+
+         # --- Mechanical state ---
+        self.L0 = rest_length
+        self.L  = rest_length
+        self.T  = 0.0
+
+        # --- Geometric frame ---
         self.axis_unit = np.zeros(2)
         self.cable_mid = np.zeros(2)
 
     # ------------------------------------------------------------------
-    # 1. Update Geometry and Tension
+    # 1. Geometry and tension (called each step before force application)
     # ------------------------------------------------------------------
     def update_geometry_tension(self):
-        """
-        Recompute SF geometry an tension. 
-        """
+        """Recompute axis_unit, cable_mid, L, and T from current pole positions."""
         # --- Geometry ---
         diff = self.node_down.pos - self.node_up.pos
         length = np.linalg.norm(diff)
@@ -54,9 +62,7 @@ class StressFibre:
             return
 
         self.L = length
-        
-        # --- Define axes ---
-        self.axis_unit = diff / length # flow/SF axis
+        self.axis_unit = diff / length 
         self.cable_mid = 0.5 * (self.node_up.pos + self.node_down.pos)
 
         # --- Tension ---
@@ -66,99 +72,87 @@ class StressFibre:
         ) 
         
     # ------------------------------------------------------------------
-    # 2. Load Accumulation
+    # 2. Polar load contribution (axial-peak parabolic)
     # ------------------------------------------------------------------
     def accumulate_loads(self, polar_nodes):
         """
-        Accumulate SF axial tension for junction loading. 
+        Contribute axial SF tension as tensile stimulus at polar nodes.
 
-        Axial SF tension used purely for loading, modelling tension
-        felt by cells at junctions despite net-zero mechanical force. 
+        Junctional tension felt at cell-cell contacts despite the
+        SF exerting no net axial force
 
-        Unlike apply_forces (which squeezes the waist), loading peaks at
-        the poles — this reflects where the cable physically attaches and
-        where junctional tension is felt by the cell. The p² weight and
-        the (1 - p²) weight in apply_forces are deliberately inverse.
+        Weight peaks at the poles (|p|=1) and is zero at the waist (p=0)
         """
-        # Half-length of fibre, used to normlaise axial position to [-1, 1
         half_L = self.L / 2
 
         for node in polar_nodes: 
-            # Raw axial distance from the fibre midpoint, along the fibre axis.
-            axial = axial_coord(node.pos, self.cable_mid, self.axis_unit)
-
-            # Normalise to [-1, 1]. 
-            p = axial / half_L # |p| = 1 at the poles and p = 0 at the waist.
-            weight = p * p # Parabolic weight: peaks at the poles.
+            # Normalised axial coordinate: 0 at waist, ±1 at poles.
+            p_axial = axial_coord(node.pos, self.cable_mid, self.axis_unit) / half_L 
+            weight = p_axial * p_axial # parabolic, peaks at poles
 
             load = max(weight * self.T, 0.0)
             node.add_tensile_load(load)
 
     # ------------------------------------------------------------------
-    # 3. Force Application
+    # 3. Waist squeeze force (inverse parabolic, Poisson-coupled)
     # ------------------------------------------------------------------
-    def apply_forces(self, nodes, positions):
+    def apply_forces(self):
         """
-        Apply SF lateral squeeze – inward at waist, zero at poles. 
+        Apply inward lateral squeeze at the cell waist.
 
-        Lateral SF contraction applied net-zero force due to 
-        "neighbouring cell forces".
-
-        Poisson coupling converts a fraction of axial tension into 
-        inwards lateral squeeze. 
-
-        Distribution is parabolic in axial coordinate. Each node pushed 
-        toward SF axis. 
+        Poisson coupling: converts fraction of axial tension into inward force. 
+        Distribution: parabolic profile peaking at waist (p=0), zero at poles (|p|=1). 
+        Normalisation: total magnitude is T × nu_sf, independent of node count.
+        Direction: along ±perp_unit (perpendicular to the fibre axis, toward the axis)
         """
         if self.T < 1e-6:
             return
         
-        # Normalised axial coord, parabolic profile peaks at waist
+        positions = np.array([n.pos for n in self.nodes])
+        
+        # --- Node coordinates in local frame ---
+        # Axial: normalised to [-1, 1]. Lateral: raw signed distance from axis.
         half_L = self.L / 2
-        p = axial_coord(positions, self.cable_mid, self.axis_unit) / half_L
-        axial_profile = np.maximum(1.0 - p * p, 0.0)
+        p_axial = axial_coord(positions, self.cable_mid, self.axis_unit) / half_L
+        lateral = lateral_coord(positions, self.cable_mid, self.axis_unit)
 
-        # Normalise weights so total squeeze = T × nu_sf
+        # --- Weight profile: parabolic axial, peaks at waist ---
+        axial_profile = np.maximum(1.0 - p_axial * p_axial, 0.0)
+
         total = axial_profile.sum()
         if total < 1e-12:
             return
         weights = axial_profile / total
 
-        F_total = self.T * self.nu_sf
+        # --- Total squeeze force from Poisson coupling ---
+        F_total = self.T * self.nu
 
-        # Direction: inward along the vector from each node to the fibre midpoint.
-        # Lateral coordinated projected onto perpendicular axis for sign.
-        lateral = lateral_coord(positions, self.cable_mid, self.axis_unit)
+        # --- Per-node force assembly ---
         perp_unit = perpendicular(self.axis_unit)
 
-        # Each node's force points along -sign(lateral) * perp_unit,
-        for node, w, lat in zip(nodes, weights, lateral):
+        for node, w, lat in zip(self.nodes, weights, lateral):
             if abs(lat) < 1e-10:
-                continue   # on-axis node, no direction to push
+                continue   #
             direction = -np.sign(lat) * perp_unit
             node.apply_force(w * F_total * direction)
 
    
     # ------------------------------------------------------------------
-    # 3. Update Activation
+    # 4. Remodelling (called each step after signalling)
     # ------------------------------------------------------------------
     def update_activation(self, mean_rhoc, dt):
         """
-        SF activation from mean cell RhoC.
+        Update activation from mean cell-wide RhoC. 
+        
+        RhoC drives activation downward (a_base → a_base − a_range), 
+            baseline 1.0, drops toward 0.70 at max RhoC
         """
-        # Compute RhoC signal from cell-wide mean RhoC
-        rhoc_signal = float(np.clip(mean_rhoc, 0.0, 1.0))
-
-        # First-order relaxation activation update towards RhoC-dependent target
-        # Baseline 1.0, drops toward 0.70 at max RhoC
-        a_target = self.a_base - (rhoc_signal * self.a_range)
-
+        # First-order relaxation activation towards RhoC-dependent target
+        a_target = self.a_base - (mean_rhoc * self.a_range)
         self.a = relax_toward(
             current=self.a, target=a_target, 
             dt=dt, tau=self.tau_remodel
         )
-
-        self.a = float(np.clip(self.a, 0.0, 1.0))
 
     # ------------------------------------------------------------------
     # Diagnostics
@@ -174,6 +168,6 @@ class StressFibre:
 
     def __repr__(self):
         return (
-            f"StressFibre(L={self.L:.3f} L0={self.L0:.3f} | "
-            f"a_sf={self.a:.3f} | T={self.T:.4f})"
+            f"StressFibre(L0={self.L0:.3f} L={self.L:.3f} | "
+            f"k={self.k:.3f} a={self.a:.3f} T={self.T:.4f})"
         )

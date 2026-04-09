@@ -10,6 +10,8 @@
 
 import numpy as np
 from abm.helpers.signalling import get_protein_recruitment
+from abm.helpers.mechanics import overdamped_step
+from src.utils import require
 
 class MembraneNode:
     """
@@ -20,7 +22,10 @@ class MembraneNode:
         self.pos = np.array(position, dtype=float)
 
         # --- Mechanics ---
+        sim = require(cfg, 'simulation')
         self.force = np.zeros(2) # Force accumulator
+        self.gamma = require(sim, 'gamma')
+        self.max_disp = require(sim, 'max_displacement')
 
         # --- Load channels (signalling stimuli) --
         self.tensile_load = 0.0 # tensile stimulus (cortex + SF + flow baseline)
@@ -34,7 +39,7 @@ class MembraneNode:
         self.rhoa, self.rhoc = 0.0,  0.0
         
     # ------------------------------------------------------------------
-    # Reset: called at the start of each timestep
+    # Reset – called at the start of each timestep
     # ------------------------------------------------------------------
     def reset_loads(self):
         """Zero load channels before re-accumulation this step."""
@@ -52,13 +57,6 @@ class MembraneNode:
         """Add a tensile stimulus contribution from a mechanical agent."""
         self.tensile_load += load
 
-    #remove
-    def set_shear(self, shear):
-        """
-        Set shear magnitude felt by nodes (from flow)
-        """
-        self.shear_total = shear
-
     def apply_force(self, force):
         """Add a force vector contribution from a mechanical agent."""
         force = np.asarray(force)
@@ -67,21 +65,10 @@ class MembraneNode:
     # ------------------------------------------------------------------
     # Integration — called once per step after all forces are accumulated
     # ------------------------------------------------------------------
-    def integrate_step(self, dt, gamma, max_displacement=0.5):
-        """
-        Converts net force to displacement.
+    def integrate_step(self, dt):
+        """Converts net force to displacement."""
+        self.pos += overdamped_step(self.force, self.gamma, dt, self.max_disp)
 
-        Overdamped integration: dx = (F / gamma) × dt.
-        Displacement clamped to max_displacement for numerical stability.
-        """
-        displacement = (self.force / gamma) * dt
-
-        # Clamp magnitude, preserving direction.
-        d_norm = np.linalg.norm(displacement)
-        if d_norm > max_displacement:
-            displacement = displacement / d_norm * max_displacement
-
-        self.pos += displacement 
 
     # ------------------------------------------------------------------
     # Signalling — called once per step after integration
