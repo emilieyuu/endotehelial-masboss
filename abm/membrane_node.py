@@ -15,7 +15,6 @@ class MembraneNode:
     def __init__(self, node_id, position, lut, cfg):
         self.id = node_id
         self.pos = np.array(position, dtype=float)
-        self.role = 'lateral'
 
         # --- Mechanics ---
         self.force = np.zeros(2)
@@ -134,7 +133,6 @@ class MembraneNode:
         return {
             'id': self.id, 
             'position': (self.pos[0].round(2), self.pos[1].round(2)), 
-            'role': self.role, 
             'tensile_load': self.tensile_load, 
             'shear_total': self.shear_total, 
             'DSP': self.DSP, 
@@ -146,9 +144,7 @@ class MembraneNode:
     
     def __repr__(self):
         return (
-            f"MembraneNode(id={self.id} | role={self.role} | "
-            f"pos={self.pos.round(2)} | "
-            f"f_n={self.f_normal:.3f} | f_t={self.f_total:.3f} | "
-            f"DSP={self.DSP:.3f} | TJP1={self.TJP1:.3f}) | JCAD={self.JCAD:.3f}) "
-            f"P_RhoA={self.P_RhoA:.3f} P_RhoC={self.P_RhoC:.3f})"
+            f"MembraneNode(id={self.id} | pos={self.pos.round(2)} | "
+            f"DSP={self.DSP:.3f} | TJP1={self.TJP1:.3f} | JCAD={self.JCAD:.3f} | "
+            f"RhoA={self.P_RhoA:.3f} | RhoC={self.P_RhoC:.3f})"
         )

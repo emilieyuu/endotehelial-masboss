@@ -18,7 +18,6 @@ class CortexSpring:
     Cortical junction between two adjacent membrane nodes.
     """
     def __init__(self, spring_id, node_1, node_2, rest_length, cfg):
-
         self.id = spring_id
         self.node_1 = node_1
         self.node_2 = node_2
@@ -45,12 +44,6 @@ class CortexSpring:
         # --- Geometry ---
         self.L = rest_length # Current/Activated length
         self.unit_vec = np.zeros(2) # Unit vector difference between nodes
-        #self.alignment = 0.0 # cos angle to flow
-
-        if self.node_1.role in ('upstream', 'downstream') or self.node_2.role in ('upstream', 'downstream'):
-            self.side = 'polar'
-        else: 
-            self.side = 'flank'
 
     # ------------------------------------------------------------------
     # 1. Update Geometry and Tension
@@ -134,17 +127,15 @@ class CortexSpring:
     def get_state(self):
         return {
             'id': self.id,
-            'side': self.side,
             'extension': round(self.L - self.L0, 4),
             'stiffness': round(self.k, 4),
             'tension': round(self.T, 4),
             'activation': round(self.a, 3), 
-            #'alignment': round(self.alignment, 3),
         }
 
     def __repr__(self):
         return (
-            f"Spring(id={self.id} | side={self.side} | "
+            f"Spring(id={self.id} | "
             f"L={self.L:.3f} L0={self.L0:.3f} | "
             f"k={self.k:.3f} | a={self.a:.3f} | T={self.T:.4f})"
         )

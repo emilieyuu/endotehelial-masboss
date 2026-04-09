@@ -15,8 +15,8 @@ from abm.membrane_node import MembraneNode
 from abm.cortex_spring import CortexSpring
 from abm.stress_fibre import StressFibre
 from abm.analysis.cell_measurement import measure_forces, measure_shape
-from abm.geometry import axial_coord, axial_projection
-from src.utils import safe_mean
+from abm.geometry import axial_coord, polar_mask
+from src.utils import safe_mean, require
 
 class EndothelialCell:
     def __init__(self, cell_id, centroid, lut, cfg,
@@ -34,7 +34,6 @@ class EndothelialCell:
 
         # Build geometry
         self.nodes = self._init_node_ring(centroid, n_nodes, radius, lut, cfg)
-        self._classify_nodes()
         self.springs = self._init_springs(n_nodes, cfg)
         self.sf = self._init_sf()
         
@@ -50,7 +49,7 @@ class EndothelialCell:
         Place n_nodes evenly on a circle, offset by π/2 so node 0
         starts at the top. 
         """
-        init_ar = self.cfg['cell_geometry'].get('init_ar', 1.2)
+        init_ar = require(self.cfg, 'cell_geometry', 'ar')
         r_x = radius * np.sqrt(init_ar) # semi-axis along flow
         r_y = radius / np.sqrt(init_ar) # semi-axis perpendicular to flow
 
@@ -65,24 +64,6 @@ class EndothelialCell:
             nodes.append(MembraneNode(i, pos, self.lut, self.cfg))
 
         return nodes
-
-    def _classify_nodes(self):
-        """
-        Upstream/downstream: argmin/argmax projection onto flow axis.
-        Lateral: all remaining nodes.
-        """
-        threshold = self.cfg['cell_geometry'].get('polar_threshold', 0.866)
-        centroid = self.centroid
-
-        for node in self.nodes:
-            projection = axial_projection(node.pos, centroid, self.flow_axis, self.radius)
-
-            if projection > threshold:
-                node.role = 'downstream'
-            elif projection < -threshold:
-                node.role = 'upstream'
-            else:
-                node.role = 'lateral'
 
     def _init_springs(self, n_nodes, cfg):
         """
@@ -134,19 +115,37 @@ class EndothelialCell:
     
     @property
     def axial_half_extent(self):
-        """
-        Current half-length of the cell along the flow axis.
-
-        Used to normalise axial node positions into a dimensionless
-        [-1, 1] range for soft polarity weighting. 
-        Computed from the current (deformed) geometry.
-        """
+        """Current half-length of the cell along the flow axis."""
         axial = axial_coord(self.positions, self.centroid, self.flow_axis)
         return float(np.max(np.abs(axial)))
         
     @property
     def polar_nodes(self):
-        return [n for n in self. nodes if n.role in ("upstream", "downstream")]
+        """Nodes currently within the polar cone"""
+        angle = require(self.cfg, 'cell_geometry', 'polar_threshold')
+        mask = polar_mask(self.positions, self.centroid, self.flow_axis, angle)
+        return [n for n, m in zip(self.nodes, mask) if m]
+    
+    @property
+    def lateral_nodes(self):
+        """Nodes outside the polar cone. Complement of polar_nodes."""
+        angle = require(self.cfg, 'cell_geometry', 'polar_threshold')
+        mask = polar_mask(self.positions, self.centroid, self.flow_axis, angle)
+        return [n for n, m in zip(self.nodes, mask) if not m]
+    
+    @property
+    def polar_springs(self):
+        """Springs with at least one polar endpoint."""
+        polar_set = set(id(n) for n in self.polar_nodes)
+        return [s for s in self.springs
+                if id(s.node_1) in polar_set or id(s.node_2) in polar_set]
+
+    @property
+    def lateral_springs(self):
+        """Springs with both endpoints lateral."""
+        polar_set = set(id(n) for n in self.polar_nodes)
+        return [s for s in self.springs
+                if id(s.node_1) not in polar_set and id(s.node_2) not in polar_set]
 
     @property 
     def rhoc_mean(self):
@@ -198,35 +197,19 @@ class EndothelialCell:
     # ------------------------------------------------------------------
     def _apply_shear_drag(self, flow):
         """
-        Apply shear drag as an extensional force concentrated at the poles.
+        Apply shear drag at polar nodes only.
         """
-        # p_ref = self.axial_half_extent
-        # if p_ref < 1e-10:
-        #     return
-        
-        # Axial coordinate of every node, signed relative to the centroid.
-        axial = axial_coord(self.positions, self.centroid, self.flow_axis)
-        p_ref = float(np.max(np.abs(axial)))
-        if p_ref < 1e-10:
+        polar = self.polar_nodes
+        if not polar:
             return
-        p = axial / p_ref
+        
+        # Signed axial coordinates
+        polar_positions = np.array([n.pos for n in polar])
+        axial = axial_coord(polar_positions, self.centroid, self.flow_axis)
 
-        # Quadratic weight: sharp concentration at poles, zero at waist.
-        weights = p * p
-
-        # Apply drag per-node along the flow axis, with sign giving direction:
-        # upstream nodes (axial < 0) get pushed further upstream,
-        # downstream nodes (axial > 0) get pushed further downstream.
-        for node, w, a in zip(self.nodes, weights, axial):
-            force = flow.drag_on_node(weight=w, axial_sign=np.sign(a))
-            #print(node.id, force)
+        for node, a in zip(polar, axial):
+            force = flow.drag_on_node(weight=1.0, axial_sign=np.sign(a))
             node.apply_force(force)
-
-        # centroid = self.centroid
-        # for node in self.polar_nodes: 
-        #     drag_force = drag
-        #     axial_sign = np.sign(np.dot(node.pos - centroid, self.flow_axis))
-        #     node.apply_force(drag_force * axial_sign * self.flow_axis)
        
     def _update_signalling_load(self, flow):
         """
@@ -346,23 +329,24 @@ class EndothelialCell:
     # ------------------------------------------------------------------
     def get_state(self):
         shape = measure_shape(self)
-        #forces = measure_forces(self)
-        polar = [s for s in self.springs if s.side == 'polar']
-        flank = [s for s in self.springs if s.side == 'flank']
+        polar_n = self.polar_nodes
+        lateral_n = self.lateral_nodes
+        polar_s = self.polar_springs
+        lateral_s = self.lateral_springs
+
         return {
             'cell_id': self.id,
             'ar': shape['ar'],
             'orientation': shape['orientation'],
             'area_ratio': shape['area_ratio'],
-            'mean_rhoa_pole': safe_mean([n.P_RhoA for n in self.nodes if n.role in ('upstream', 'downstream')]),
-            'mean_rhoa_lat': safe_mean([n.P_RhoA for n in self.nodes if n.role == 'lateral']),
-            'mean_rhoa': safe_mean([n.P_RhoA for n in self.nodes]),
-            'mean_rhoc': safe_mean([n.P_RhoC for n in self.nodes]),
+            'mean_rhoa_polar': safe_mean([n.P_RhoA for n in polar_n]),
+            'mean_rhoa_lateral': safe_mean([n.P_RhoA for n in lateral_n]),
+            'mean_rhoc': round(self.rhoc_mean, 3),
             'a_sf': round(self.sf.a, 3),
             'sf_tension': round(self.sf.T, 3),
-            'k_pole': round(np.mean([s.k for s in polar]), 3) if polar else 0,
-            'k_flank': round(np.mean([s.k for s in flank]), 3) if flank else 0,
-            'tensile_pole': safe_mean([n.tensile_load for n in self.nodes if n.role in ('upstream', 'downstream')]),
+            'k_polar': round(np.mean([s.k for s in polar_s]), 3) if polar_s else 0,
+            'k_lateral': round(np.mean([s.k for s in lateral_s]), 3) if lateral_s else 0,
+            'tensile_polar': safe_mean([n.tensile_load for n in polar_n]),
             'f_total': safe_mean([n.shear_total for n in self.nodes]),
         }
     

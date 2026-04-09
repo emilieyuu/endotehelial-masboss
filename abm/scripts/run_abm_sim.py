@@ -45,20 +45,25 @@ def get_spring_states(cell, exp_dict) -> list:
 def plot_cell(cell, title=''):
     """
     Minimal cell plot — nodes and springs on axes only.
-    Call standalone or via run_sim(plot=True).
+    Nodes are coloured by current polar/lateral classification,
+    recomputed from the cell's geometry at plot time.
     """
     fig, ax = plt.subplots(1, 1, figsize=(5, 5))
 
-    # Springs
+    # Build polar set once for O(1) membership lookup during node draw.
+    polar_set = set(id(n) for n in cell.polar_nodes)
+
+    # Springs — uniform colour (differentiation by polar/lateral at
+    # plot time is possible but rarely useful; keep it simple).
     for s in cell.springs:
         p1, p2 = s.node_1.pos, s.node_2.pos
         ax.plot([p1[0], p2[0]], [p1[1], p2[1]],
                 'b-', linewidth=1.2, alpha=0.6)
 
-    # Nodes coloured by role
-    colors = {'upstream': 'red', 'downstream': 'orange', 'lateral': 'steelblue'}
+    # Nodes coloured by current polar/lateral classification.
     for n in cell.nodes:
-        ax.scatter(*n.pos, c=colors[n.role], s=50, zorder=4)
+        colour = 'red' if id(n) in polar_set else 'steelblue'
+        ax.scatter(*n.pos, c=colour, s=50, zorder=4)
         ax.text(n.pos[0] + 0.02, n.pos[1] + 0.02,
                 str(n.id), fontsize=8, color='black', zorder=6)
 

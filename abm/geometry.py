@@ -51,14 +51,34 @@ def perpendicular(vec):
     Used to build the lateral axis from the flow axis.
     """
     return np.array([-vec[1], vec[0]])
-####
 
-def axial_projection(pos, origin, axis, radius):
-    vec = pos - origin
+def polar_mask(points, origin, axis, angle_deg):
+    """
+    Boolean mask marking point withing angle_deg from axis, measured from origin.
+
+    points: (N, 2) — points to classify
+    origin: (2,) — reference point 
+    axis: (2,) — direction vector, normalised internally
+    angle_deg : float — half-cone angle in degrees. Points within this
+                        angle of ±axis are marked polar.
+
+    Returns: (N,) boolean array — True for polar, False for lateral.
+    """
+    # Normalise axis.
     axis = np.asarray(axis, dtype=float)
-    axis /= np.linalg.norm(axis)
-    dist = np.dot(vec, axis)
-    return np.clip(dist/(radius + 1e-8), -1.0, 1.0)
+    axis = axis / np.linalg.norm(axis)
+
+    # Offset vectors from origin to each point.
+    offsets = points - origin
+    norms = np.linalg.norm(offsets, axis=1)
+
+    # |cos(angle)| between each offset and the flow axis.
+    cos_angles = np.abs(offsets @ axis) / (norms + 1e-10)
+    
+    # A point is polar iff its angle to the axis is ≤ angle_deg,
+    cos_threshold = np.cos(np.deg2rad(angle_deg))
+    return cos_angles >= cos_threshold 
+
 
 
 

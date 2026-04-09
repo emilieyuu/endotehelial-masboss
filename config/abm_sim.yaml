@@ -29,7 +29,7 @@ cell_geometry:
   n_nodes: 16
   radius: 12.0
   init_ar: 1.0
-  polar_threshold: 0.866
+  polar_threshold: 30
 
 
 # -----------------------------------------------------------------------------
@@ -45,9 +45,9 @@ flow:
 # -----------------------------------------------------------------------------
 hill_params:
   DSP:
-    K: 20 #
+    K: 15 #
     n: 3 # 
-    p_max: 0.67         # MaBoSS LUT ceiling — fixed
+    p_max: 0.67 # MaBoSS LUT ceiling — fixed
     knocked_out: false   # set true for DSP_KO perturbation
 
   TJP1:
