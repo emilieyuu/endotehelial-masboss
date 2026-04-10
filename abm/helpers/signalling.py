@@ -3,20 +3,20 @@
 # Signalling functions: map mechanical inputs to protein recruitment.
 from src.utils import require
 
-def hill(tau, K, n):
+def hill(S, K, n):
     """
     Hill activation function. 
     Maps mechanical stimulus to protein recruitment probability. 
 
-    tau: stimulus magnitude
+    S: stimulus magnitude
     K: half-activation threshold
     n: Hill coefficient (switch sharpness)
     """
     # No recruitment under compression. 
-    if tau <= 0: 
+    if S <= 0: 
         return 0.0 
     
-    return tau**n / (K**n + tau**n)
+    return S**n / (K**n + S**n)
 
 def get_protein_recruitment(cfg, tau, protein):
     """
@@ -33,6 +33,6 @@ def get_protein_recruitment(cfg, tau, protein):
 
     K = require(params, 'K')
     n = require(params, 'n')
-    p_max = require(params, 'p_max')
+    max = require(params, 'max')
 
-    return hill(tau, K, n) * p_max
+    return hill(tau, K, n) * max

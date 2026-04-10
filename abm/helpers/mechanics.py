@@ -18,7 +18,7 @@ def bilinear_tension(l, l0, k, kc_ratio):
         return k * kc_ratio * extension 
 
 def relax_toward(current, target, dt, tau): 
-    """
+    """  
     First order relaxation: (dx/dt = target - current) / tau
 
     Used for first-order relaxation of contractility towards target. 

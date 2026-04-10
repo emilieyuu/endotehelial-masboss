@@ -24,7 +24,7 @@ class MembraneNode:
         # --- Mechanics ---
         sim = require(cfg, 'simulation')
         self.force = np.zeros(2) # Force accumulator
-        self.gamma = require(sim, 'gamma')
+        self.visc = require(sim, 'viscosity')
         self.max_disp = require(sim, 'max_displacement')
 
         # --- Load channels (signalling stimuli) --
@@ -67,7 +67,7 @@ class MembraneNode:
     # ------------------------------------------------------------------
     def integrate_step(self, dt):
         """Converts net force to displacement."""
-        self.pos += overdamped_step(self.force, self.gamma, dt, self.max_disp)
+        self.pos += overdamped_step(self.force, self.visc, dt, self.max_disp)
 
 
     # ------------------------------------------------------------------
@@ -83,14 +83,14 @@ class MembraneNode:
         JCAD: total shear magnitude 
         """
         # Clamp mechanical loads to non-negatice
-        tau_dsp  = max(self.tensile_load, 0.0)
-        tau_tjp1 = max(self.shear_total, 0.0) 
-        tau_jcad = max(self.shear_total, 0.0) 
+        S_dsp  = max(self.tensile_load, 0.0)
+        S_tjp1 = max(self.shear_total, 0.0) 
+        S_jcad = max(self.shear_total, 0.0) 
 
         # Hill → junction protein recruitment
-        self.DSP  = get_protein_recruitment(self.cfg, tau_dsp, 'DSP')
-        self.TJP1 = get_protein_recruitment(self.cfg, tau_tjp1, 'TJP1')
-        self.JCAD = get_protein_recruitment(self.cfg, tau_jcad, 'JCAD')
+        self.DSP  = get_protein_recruitment(self.cfg, S_dsp, 'DSP')
+        self.TJP1 = get_protein_recruitment(self.cfg, S_tjp1, 'TJP1')
+        self.JCAD = get_protein_recruitment(self.cfg, S_jcad, 'JCAD')
 
         # LUT → Rho activation
         self.rhoa, self.rhoc = self.lut.query(self.DSP, self.TJP1, self.JCAD)

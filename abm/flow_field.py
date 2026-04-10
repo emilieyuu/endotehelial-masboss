@@ -16,14 +16,14 @@ class FlowField:
         flow_cfg = cfg['flow']
 
         # Magnitude clamped to non-negative 
-        self.magnitude = max(require(flow_cfg, 'f_magnitude'), 0.0)
+        self.magnitude = max(require(flow_cfg, 'magnitude'), 0.0)
 
         # Drag force magnitude
-        drag_frac = require(flow_cfg, 'f_drag_fraction')
+        drag_frac = require(flow_cfg, 'drag_fraction')
         self.drag = self.magnitude * drag_frac
 
         # Normalised flow direction
-        direction = np.asarray(require(flow_cfg, 'f_direction'), dtype=float)
+        direction = np.asarray(require(flow_cfg, 'direction'), dtype=float)
         norm = np.linalg.norm(direction)
 
         if norm < 1e-10:

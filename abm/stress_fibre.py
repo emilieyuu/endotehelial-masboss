@@ -24,21 +24,22 @@ class StressFibre:
 
         # --- Config-derived parameters ---
         sf_cfg = require(cfg, 'stress_fibre')
+        mech_cfg = require(cfg, 'mechanics')
 
         # Activation: quiescent baseline + RhoC-driven contraction capacity
         self.a_base = require(sf_cfg, 'a_base')
-        self.a_range = require(sf_cfg, 'a_range')
+        self.a_drop = require(sf_cfg, 'a_drop')
         self.a = self.a_base # start at baselien
 
         # Stiffness: fixed at init, scaled down from cortex
-        self.k = require(sf_cfg, 'k_fraction') * require(cfg, 'cortex', 'k_base') 
+        self.k = require(mech_cfg, 'k_base') * require(sf_cfg, 'k_fraction')  
 
         # Poisson coupling coefficient: fraction of axial tension
         self.nu = require(sf_cfg, 'nu')
 
         # Shared mechanical paramters
-        self.kc_ratio = require(cfg, 'mechanics', 'kc_ratio') # compression : tension stiffness
-        self.tau_remodel = require(cfg, 'mechanics', 'tau_remodel')
+        self.kc_ratio = require(mech_cfg, 'kc_ratio') # compression : tension stiffness
+        self.tau_remodel = require(mech_cfg, 'tau_remodel')
 
          # --- Mechanical state ---
         self.L0 = rest_length
@@ -148,7 +149,7 @@ class StressFibre:
             baseline 1.0, drops toward 0.70 at max RhoC
         """
         # First-order relaxation activation towards RhoC-dependent target
-        a_target = self.a_base - (mean_rhoc * self.a_range)
+        a_target = self.a_base - (mean_rhoc * self.a_drop)
         self.a = relax_toward(
             current=self.a, target=a_target, 
             dt=dt, tau=self.tau_remodel

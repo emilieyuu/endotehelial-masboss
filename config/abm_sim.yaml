@@ -3,7 +3,6 @@
 
 experiment: "abm_simulation"
 
-
 # -----------------------------------------------------------------------------
 # FILES
 # -----------------------------------------------------------------------------
@@ -18,7 +17,7 @@ files:
 simulation:
   dt: 0.1
   n_steps: 1500
-  gamma: 3.0 # viscous drag coefficient (overdamped friction)
+  viscosity: 3.0 # viscous drag coefficient (overdamped friction)
   max_displacement: 0.5 # per-step displacement clamp (numerical stability)
 
 # -----------------------------------------------------------------------------
@@ -35,18 +34,17 @@ cell:
 # FLOW — External shear stress 
 # -----------------------------------------------------------------------------
 flow:
-  f_magnitude: 10.0
-  f_direction: [1.0, 0.0]
-  f_drag_fraction: 0.1 # fraction of flow magnitude transmitted as drag
+  magnitude: 10.0
+  direction: [1.0, 0.0]
+  drag_fraction: 0.1 # fraction of flow magnitude transmitted as drag
 
 # -----------------------------------------------------------------------------
 # CORTEX — Cortical spring properties
 # -----------------------------------------------------------------------------
 cortex:
-  k_base: 1.0 # baseline stiffness (nN/µm)
-  k_range: 1.0 # RhoA-driven stiffness increase capacity
+  k_gain: 1.0 # RhoA-driven stiffness increase capacity
   a_base: 0.95 # baseline activation (rest length fraction)
-  a_range: 0.15 # RhoA-driven activation decrease capacity
+  a_drop: 0.15 # RhoA-driven activation decrease capacity
 
 # -----------------------------------------------------------------------------
 # STRESS FIBRE — Cable properties
@@ -54,13 +52,14 @@ cortex:
 stress_fibre:
   k_fraction: 0.7 # SF stiffness as fraction of cortex k_base
   a_base: 1.0  # baseline (relaxed at quiescence)
-  a_range: 0.25  # RhoC-driven activation decrease capacity
+  a_drop: 0.25  # RhoC-driven activation decrease capacity
   nu: 0.3 # Poisson coupling for waist squeeze
 
 # -----------------------------------------------------------------------------
 # SHARED MECHANICS — Cross-cutting mechanical parameters
 # -----------------------------------------------------------------------------
 mechanics:
+  k_base: 1.0 #(k_tensile), baseline stiffness & cortex stiffness
   kc_ratio: 0.1 # compression/tension stiffness ratio (bilinear law)
   tau_remodel: 30.0 # first-order relaxation timescale (min)
 
@@ -68,9 +67,9 @@ mechanics:
 # SIGNALLING — Hill function parameters for junction protein recruitment
 # -----------------------------------------------------------------------------
 hill_params:
-  DSP:  {K: 15, n: 3, p_max: 0.67, knocked_out: false}
-  TJP1: {K: 8,  n: 2, p_max: 0.67, knocked_out: false}
-  JCAD: {K: 4,  n: 2, p_max: 0.67, knocked_out: false}
+  DSP:  {K: 15, n: 3, max: 0.67, knocked_out: false}
+  TJP1: {K: 8,  n: 2, max: 0.67, knocked_out: false}
+  JCAD: {K: 4,  n: 2, max: 0.67, knocked_out: false}
 
 
 # -----------------------------------------------------------------------------

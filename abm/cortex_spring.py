@@ -28,15 +28,16 @@ class CortexSpring:
 
         # --- Config-derived parameters ---
         cortex_cfg = require(cfg, 'cortex')
+        mech_cfg = require(cfg, 'mechanics')
 
         # Activation: baseline pretension + RhoA-driven contraction capacity.
         self.a_base = require(cortex_cfg, 'a_base') 
-        self.a_range = require(cortex_cfg, 'a_range') 
+        self.a_drop = require(cortex_cfg, 'a_drop') 
         self.a = self.a_base # start at baseline       
 
         # Stiffness: baseline + RhoA-driven stiffening capacity.
-        self.k_base = require(cortex_cfg, 'k_base')
-        self.k_range = require(cortex_cfg, 'k_range') 
+        self.k_base = require(mech_cfg, 'k_base')
+        self.k_gain = require(cortex_cfg, 'k_gain') 
         self.k = self.k_base # start at baseline
 
         # Shared mechanical paramters
@@ -115,10 +116,10 @@ class CortexSpring:
         mean_rhoa = 0.5 * (self.node_1.rhoa + self.node_2.rhoa)
 
         # Instant stiffness update
-        self.k = self.k_base + (mean_rhoa * self.k_range)
+        self.k = self.k_base + (mean_rhoa * self.k_gain)
 
         # First-order relaxation towards RhoA-dependent target activation
-        a_target = self.a_base - (mean_rhoa * self.a_range)
+        a_target = self.a_base - (mean_rhoa * self.a_drop)
         self.a = relax_toward(
             current=self.a, target=a_target, 
             dt=dt, tau=self.tau_remodel
