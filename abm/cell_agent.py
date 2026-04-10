@@ -16,13 +16,13 @@ import numpy as np
 from abm.membrane_agent import MemAgent
 from abm.cortex_spring import CortexSpring
 from abm.sf_spring import SfSpring
-from abm.analysis.cell_measurement import measure_forces, measure_shape
+
 from abm.helpers.geometry import (
     axial_coord, polar_mask, 
     polygon_area, polygon_outward_normals, polygon_arc_lengths
 )
 
-from src.utils import safe_mean, require
+from src.utils import require
 
 class CellAgent:
     """
@@ -276,36 +276,8 @@ class CellAgent:
     # ------------------------------------------------------------------
     # Diganostics
     # ------------------------------------------------------------------
-    def get_state(self):
-        shape = measure_shape(self)
-        polar_n = self.polar_nodes
-        lateral_n = self.lateral_nodes
-        polar_s = self.polar_springs
-        lateral_s = self.lateral_springs
-
-        return {
-            'cell_id': self.id,
-            'ar': shape['ar'],
-            'orientation': shape['orientation'],
-            'area_ratio': shape['area_ratio'],
-            'mean_rhoa_polar': safe_mean([n.rhoa for n in polar_n]),
-            'mean_rhoa_lateral': safe_mean([n.rhoa for n in lateral_n]),
-            'mean_rhoc': round(self.rhoc_mean, 3),
-            'a_sf': round(self.sf.a, 3),
-            'sf_tension': round(self.sf.T, 3),
-            'k_polar': round(np.mean([s.k for s in polar_s]), 3) if polar_s else 0,
-            'k_lateral': round(np.mean([s.k for s in lateral_s]), 3) if lateral_s else 0,
-            'tensile_polar': safe_mean([n.tensile_load for n in polar_n]),
-            'f_total': safe_mean([n.shear_total for n in self.nodes]),
-        }
-    
-    def get_diagnostics(self):
-        """Full force diagnostics — use for analysis, not sweeps."""
-        return measure_forces(self)
-    
     def __repr__(self):
         return (
             f"EndothelialCell(id={self.id} | n_nodes={self.n_nodes} | "
             f"rhoa={self.rhoa_mean:.3f} rhoc={self.rhoc_mean:.3f} | "
-            f"sf_a={self.sf.a:.3f})"
         )

@@ -19,6 +19,7 @@ simulation:
   n_steps: 1500
   viscousity: 3.0 # viscous drag coefficient (overdamped friction)
   max_displacement: 0.5 # per-step displacement clamp (numerical stability)
+  detail_log_interval: 100
 
 # -----------------------------------------------------------------------------
 # CELL — Initial geometry and discretisation
