@@ -1,4 +1,4 @@
-# abm/membrane_node.py
+# abm/membrane_agent.py
 #
 # A discrete point on the cell membrane carrying mechanical and signalling state. 
 # Nodes are the fundamental agents of the ABM.
@@ -13,7 +13,7 @@ from abm.helpers.signalling import get_protein_recruitment
 from abm.helpers.mechanics import overdamped_step
 from src.utils import require
 
-class MembraneNode:
+class MemAgent:
     """
     A single membrane node: position, accumulated force, signalling state.
     """
@@ -24,7 +24,7 @@ class MembraneNode:
         # --- Mechanics ---
         sim = require(cfg, 'simulation')
         self.force = np.zeros(2) # Force accumulator
-        self.visc = require(sim, 'viscosity')
+        self.visc = require(sim, 'viscousity')
         self.max_disp = require(sim, 'max_displacement')
 
         # --- Load channels (signalling stimuli) --

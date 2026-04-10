@@ -7,7 +7,7 @@ import copy
 from datetime import datetime
 
 from abm.flow_field import FlowField
-from abm.endothelial_cell import EndothelialCell
+from abm.cell_agent import CellAgent
 from src.utils import save_df_to_csv
 
 # --------------------------------------------------
@@ -89,7 +89,7 @@ def run_abm_sim_single(cfg, lut, n_steps, perturbation = 'WT', plot=False):
 
     # Initiate flowfield and cell
     flow = FlowField(cfg)
-    cell = EndothelialCell( 
+    cell = CellAgent( 
         cell_id=0, flow_axis=flow.direction,
         lut=lut, cfg=cfg
     )

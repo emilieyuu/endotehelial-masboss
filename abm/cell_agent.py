@@ -13,9 +13,9 @@
 
 import numpy as np
 
-from abm.membrane_node import MembraneNode
+from abm.membrane_agent import MemAgent
 from abm.cortex_spring import CortexSpring
-from abm.stress_fibre import StressFibre
+from abm.sf_spring import SfSpring
 from abm.analysis.cell_measurement import measure_forces, measure_shape
 from abm.helpers.geometry import (
     axial_coord, polar_mask, 
@@ -24,7 +24,7 @@ from abm.helpers.geometry import (
 
 from src.utils import safe_mean, require
 
-class EndothelialCell:
+class CellAgent:
     """
     Closed-ring polygonal cell with cortex springs and one stress fibre.
 
@@ -75,7 +75,7 @@ class EndothelialCell:
         nodes  = []
         for i, angle in enumerate(angles):
             pos = centroid + radius * np.array([np.cos(angle), np.sin(angle)])
-            nodes.append(MembraneNode(i, pos, self.lut, cfg))
+            nodes.append(MemAgent(i, pos, self.lut, cfg))
         return nodes
 
     def _init_springs(self, cfg):
@@ -98,7 +98,7 @@ class EndothelialCell:
         dn_id = int(np.argmax(projections))
         L_rest = projections.max() - projections.min()
 
-        return StressFibre(
+        return SfSpring(
             node_up=self.nodes[up_id],
             node_down=self.nodes[dn_id],
             nodes=self.nodes,

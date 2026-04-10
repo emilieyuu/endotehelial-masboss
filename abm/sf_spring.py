@@ -1,4 +1,4 @@
-# abm/stress_fibre.py
+# abm/sf_spring.py
 #
 # A single contractile stress fibre spanning the cell along the flow axis. 
 # 
@@ -11,7 +11,7 @@ from abm.helpers.mechanics import bilinear_tension, relax_toward
 from abm.helpers.geometry import axial_coord, lateral_coord, perpendicular
 from src.utils import require
 
-class StressFibre:
+class SfSpring:
     """
     Contractile stress fibre cable along flow axis, 
     connects upstream and downstream poles. 
