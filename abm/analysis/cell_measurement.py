@@ -88,14 +88,16 @@ def measure_cell(cell):
         'major':             shape['major'],
         'minor':             shape['minor'],
 
-        # --- signalling: Rho ---
+        # --- loading ---
+        't_load_polar':      safe_mean([n.tensile_load for n in polar_n]),
+        't_load_lat':        safe_mean([n.tensile_load for n in lateral_n]),
+
+        # --- signalling: Loading & Rho ---
         'rhoa_mean':         round(rhoa_mean, 3),
         'rhoc_mean':         round(rhoc_mean, 3),
         'rho_balance':       round(rhoc_mean - rhoa_mean, 3),
         'rhoa_polar':        safe_mean([n.rhoa for n in polar_n]),
         'rhoa_lateral':      safe_mean([n.rhoa for n in lateral_n]),
-        'rhoc_polar':        safe_mean([n.rhoc for n in polar_n]),
-        'rhoc_lateral':      safe_mean([n.rhoc for n in lateral_n]),
 
         # --- signalling: recruitment ---
         'dsp_mean':          safe_mean([n.DSP  for n in cell.nodes]),
@@ -105,10 +107,8 @@ def measure_cell(cell):
         'dsp_lateral':       safe_mean([n.DSP  for n in lateral_n]),
 
         # --- cortex mechanics ---
-        'cortex_T_mean':     safe_mean([s.T for s in cell.springs]),
         'cortex_T_polar':    safe_mean([s.T for s in polar_s]),
         'cortex_T_lateral':  safe_mean([s.T for s in lateral_s]),
-        'cortex_k_mean':     safe_mean([s.k for s in cell.springs]),
         'cortex_k_polar':    safe_mean([s.k for s in polar_s]),
         'cortex_k_lateral':  safe_mean([s.k for s in lateral_s]),
         'cortex_a_mean':     safe_mean([s.a for s in cell.springs]),

@@ -51,7 +51,7 @@ cortex:
 # STRESS FIBRE — Cable properties
 # -----------------------------------------------------------------------------
 stress_fibre:
-  k_fraction: 0.7 # SF stiffness as fraction of cortex k_base
+  k_fraction: 0.6 # SF stiffness as fraction of cortex k_base
   a_base: 1.0  # baseline (relaxed at quiescence)
   a_drop: 0.25  # RhoC-driven activation decrease capacity
   nu: 0.3 # Poisson coupling for waist squeeze
@@ -68,8 +68,8 @@ mechanics:
 # SIGNALLING — Hill function parameters for junction protein recruitment
 # -----------------------------------------------------------------------------
 hill_params:
-  DSP:  {K: 15, n: 3, max: 0.67, knocked_out: false}
-  TJP1: {K: 8,  n: 2, max: 0.67, knocked_out: false}
+  DSP:  {K: 18, n: 3, max: 0.67, knocked_out: false}
+  TJP1: {K: 6,  n: 2, max: 0.67, knocked_out: false}
   JCAD: {K: 4,  n: 2, max: 0.67, knocked_out: false}
 
 
