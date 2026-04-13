@@ -84,7 +84,7 @@ class MemAgent:
         """
         # Clamp mechanical loads to non-negatice
         S_dsp  = max(self.tensile_load, 0.0)
-        S_tjp1 = max(self.shear_total, 0.0) 
+        S_tjp1 = max(self.tensile_load, 0.0) 
         S_jcad = max(self.shear_total, 0.0) 
 
         # Hill → junction protein recruitment
