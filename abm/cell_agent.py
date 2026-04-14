@@ -15,7 +15,7 @@ import numpy as np
 
 from abm.membrane_agent import MemAgent
 from abm.cortex_spring import CortexSpring
-from abm.sf_spring import SfSpring
+from abm.sf_cable import SfCable
 
 from abm.helpers.geometry import (
     axial_coord, polar_mask, 
@@ -98,7 +98,7 @@ class CellAgent:
         dn_id = int(np.argmax(projections))
         L_rest = projections.max() - projections.min()
 
-        return SfSpring(
+        return SfCable(
             node_up=self.nodes[up_id],
             node_down=self.nodes[dn_id],
             nodes=self.nodes,
@@ -186,8 +186,7 @@ class CellAgent:
         for node, w, a in zip(self.nodes, weights, axial):
             force = flow.drag_on_node(weight=w, axial_sign=np.sign(a))
             node.apply_force(force)
-
-
+            
         # polar = self.polar_nodes
         # if not polar:
         #     return
@@ -243,56 +242,41 @@ class CellAgent:
         Forces accumulate before integration. Signalling reads
         post-integration geometry. Remodelling sets state for next step.
         """
-        # 1. Reset
-        for n in self.nodes: 
-            n.reset_loads()
-            n.reset_force()
-
-        # 2. External stimuli from flow
+        # 1. External stimuli from flow
         self._apply_shear_drag(flow_field)
         for node in self.nodes:
             node.shear_total  = flow_field.magnitude
             node.tensile_load += flow_field.magnitude
 
-        # 3. Geometry + tension 
+        # 2. Geometry + tension 
         for s in self.springs:
             s.update_geometry_tension()
         self.sf.update_geometry_tension()
 
-        # 3. Accumulate Tensile Loading
-        for s in self.springs:
-            s.accumulate_loads()
-
-        self.sf.accumulate_loads(self.polar_nodes)
-
-        # 4. Tensile stimuli to load channels
+        # 3. Tensile stimuli to load channels
         for s in self.springs:
             s.accumulate_loads()
         self.sf.accumulate_loads(self.polar_nodes)
 
-        # 5. Mechanical forces applied to nodes
+        # 4. Mechanical forces applied to nodes
         for s in self.springs:
             s.apply_forces()
         self.sf.apply_forces()
 
-        # 6. Area pressure
+        # 5. Area pressure
         self.current_area = polygon_area(self.positions)
         self._apply_pressure()
 
-         # 7. Integration — each node advances by its net force
+         # 6. Integration — each node advances by its net force
         for node in self.nodes:
-            node.integrate_step(dt)
+            node.step(dt)
 
-        # 8. Signalling — each node reads its new loads and updates Rho
-        for node in self.nodes:
-            node.update_signalling()
-
-        # 9. Remodelling — cortex reads local RhoA, SF reads cell-wide RhoC mean
+        # 7. Remodelling — cortex reads local RhoA, SF reads cell-wide RhoC mean
         for s in self.springs:
             s.update_stiffness_and_activation(dt)
         self.sf.update_activation(mean_rhoc=self.rhoc_mean, dt=dt)
 
-        # 10. Sync area for next step's pressure calculation
+        # 8. Sync area for next step's pressure calculation
         self.current_area = polygon_area(self.positions)
  
     # ------------------------------------------------------------------

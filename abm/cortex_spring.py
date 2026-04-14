@@ -48,6 +48,8 @@ class CortexSpring:
         self.L0 = rest_length 
         self.L = rest_length 
         self.T = 0.0 
+
+        # --- Geometry ---
         self.unit_vec = np.zeros(2)
 
     # ------------------------------------------------------------------

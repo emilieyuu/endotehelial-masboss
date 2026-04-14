@@ -37,43 +37,18 @@ class MemAgent:
 
         self.DSP, self.TJP1, self.JCAD = 0.0, 0.0, 0.0
         self.rhoa, self.rhoc = 0.0,  0.0
-        
-    # ------------------------------------------------------------------
-    # Reset – called at the start of each timestep
-    # ------------------------------------------------------------------
-    def reset_loads(self):
-        """Zero load channels before re-accumulation this step."""
-        self.tensile_load = 0.0
-        self.shear_total = 0.0
-
-    def reset_force(self):
-        """Zero force accumulator before re-accumulation this step."""
-        self.force[:] = 0.0
-
-    # ------------------------------------------------------------------
-    # Accumulators — called by springs, stress fibre, flow
-    # ------------------------------------------------------------------
-    def add_tensile_load(self, load):
-        """Add a tensile stimulus contribution from a mechanical agent."""
-        self.tensile_load += load
-
-    def apply_force(self, force):
-        """Add a force vector contribution from a mechanical agent."""
-        force = np.asarray(force)
-        self.force += force
 
     # ------------------------------------------------------------------
     # Integration — called once per step after all forces are accumulated
     # ------------------------------------------------------------------
-    def integrate_step(self, dt):
+    def _update_position(self, dt):
         """Converts net force to displacement."""
         self.pos += overdamped_step(self.force, self.visc, dt, self.max_disp)
-
 
     # ------------------------------------------------------------------
     # Signalling — called once per step after integration
     # ------------------------------------------------------------------
-    def update_signalling(self):
+    def _update_signalling(self):
         """
         Update protein recruitment and Rho activation from current loads.
         Pipeline: mechanical loads → Hill → junction proteins → LUT → Rho activation
@@ -94,6 +69,36 @@ class MemAgent:
 
         # LUT → Rho activation
         self.rhoa, self.rhoc = self.lut.query(self.DSP, self.TJP1, self.JCAD)
+    
+    # ------------------------------------------------------------------
+    # Step
+    # ------------------------------------------------------------------
+    def step(self, dt): 
+        """
+        Membrane Agents Step, called by cell during its own step() function.
+        1. Update its own position (mechanical)
+        2. Updates its own signalling
+        3. Resets load channels and forces. 
+        """
+        self._update_position(dt)
+        self._update_signalling()
+        
+        # Reset load channels and force before next step
+        self.tensile_load = 0.0
+        self.shear_total = 0.0
+        self.force[:] = 0.0
+
+    # ------------------------------------------------------------------
+    # Accumulators — called by springs, stress fibre, flow
+    # ------------------------------------------------------------------
+    def add_tensile_load(self, load):
+        """Add a tensile stimulus contribution from a mechanical agent."""
+        self.tensile_load += load
+
+    def apply_force(self, force):
+        """Add a force vector contribution from a mechanical agent."""
+        force = np.asarray(force)
+        self.force += force
 
     # ------------------------------------------------------------------
     # Diagnostics

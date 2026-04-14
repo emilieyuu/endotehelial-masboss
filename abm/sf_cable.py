@@ -11,7 +11,7 @@ from abm.helpers.mechanics import bilinear_tension, relax_toward
 from abm.helpers.geometry import axial_coord, lateral_coord, perpendicular
 from src.utils import require
 
-class SfSpring:
+class SfCable:
     """
     Contractile stress fibre cable along flow axis, 
     connects upstream and downstream poles. 
@@ -85,6 +85,8 @@ class SfSpring:
         Weight peaks at the poles (|p|=1) and is zero at the waist (p=0)
         """
         half_L = self.L / 2
+        if half_L < 1e-10:
+            return
 
         for node in polar_nodes: 
             # Normalised axial coordinate: 0 at waist, ±1 at poles.
@@ -114,6 +116,9 @@ class SfSpring:
         # --- Node coordinates in local frame ---
         # Axial: normalised to [-1, 1]. Lateral: raw signed distance from axis.
         half_L = self.L / 2
+        if half_L < 1e-10:
+            return
+        
         p_axial = axial_coord(positions, self.cable_mid, self.axis_unit) / half_L
         lateral = lateral_coord(positions, self.cable_mid, self.axis_unit)
 

@@ -51,7 +51,7 @@ def measure_cell(cell):
 
     Columns are grouped:
       - identifiers
-      - shape (PCA + perimeter + area ratio)
+      - shape (AR + perimeter + area ratio)
       - signalling: Rho activation (means + spatial split + balance)
       - signalling: junction protein recruitment (means + DSP spatial split)
       - cortex mechanics (T, k, a — means + spatial splits)
