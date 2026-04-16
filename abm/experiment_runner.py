@@ -150,10 +150,10 @@ class ExperimentRunner:
         ss_df = pd.DataFrame(ss_rows)
 
         if result_dir is not None:
-            save_df_to_csv(cell_ts_df, result_dir, "abm_cell_timeseries", ts=True)
-            save_df_to_csv(spring_ts_df, result_dir, "abm_spring_timeseries", ts=True)
-            save_df_to_csv(node_ts_df, result_dir, "abm_node_timeseries", ts=True)
-            save_df_to_csv(ss_df, result_dir, "abm_steady_state", ts=True)
+            save_df_to_csv(cell_ts_df, result_dir, "abm_cell_timeseries", ts=False)
+            save_df_to_csv(spring_ts_df, result_dir, "abm_spring_timeseries", ts=False)
+            save_df_to_csv(node_ts_df, result_dir, "abm_node_timeseries", ts=False)
+            save_df_to_csv(ss_df, result_dir, "abm_steady_state", ts=False)
             print(f">>> INFO: Results saved to {result_dir}")
 
         return {
