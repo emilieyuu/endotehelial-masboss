@@ -31,7 +31,7 @@ def require(cfg, *keys):
 # ------------------------------------------------------------------
 # File Access Utils
 # ------------------------------------------------------------------
-def save_df_to_csv(df, out_dir, base_name, timestamp=False):
+def save_df_to_csv(df, out_dir, base_name, ts=False):
     """
     Save DataFrame to CSV.
 
@@ -43,9 +43,9 @@ def save_df_to_csv(df, out_dir, base_name, timestamp=False):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    if timestamp:
-        ts        = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        file_name = f"{base_name}_{ts}.csv"
+    if ts:
+        time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        file_name = f"{base_name}_{time}.csv"
     else:
         file_name = f"{base_name}.csv"
 

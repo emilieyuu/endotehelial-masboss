@@ -13,6 +13,7 @@
 
 import time
 import pandas as pd
+import copy
 
 from abm.flow_field import FlowField
 from abm.cell import Cell
@@ -91,6 +92,9 @@ class Simulation:
         print(f">>> INFO: Running perturbation: {self.perturbation} for {self.n_steps} steps.")
         t_start = time.perf_counter()
 
+        # Deep copy of cell for results and plotting
+        cell_initial = copy.deepcopy(self.cell)
+
         for step in range(self.n_steps):
             self.cell.step(self.flow, dt=self.dt)
             self._record_step(step)
@@ -107,15 +111,13 @@ class Simulation:
         node_ss = [{**ss_exp_dict, **r} for r in measure_nodes(self.cell)]
 
         runtime = time.perf_counter() - t_start
+        
         print(
             f" {self.perturbation} ar={cell_ss['ar']:.3f} | "
             f"rho_balance={cell_ss['rho_balance']:.3f} | "
             f"rhoa={cell_ss['rhoa_mean']:.3f} | rhoc={cell_ss['rhoc_mean']:.3f} | "
             f"t={runtime:.1f}s"
         )
-
-        if self.plot:
-            self.plot_cell(title=f"{self.perturbation} (final)")
 
         return {
             "perturbation": self.perturbation,
@@ -125,29 +127,6 @@ class Simulation:
             "cell_ss": cell_ss,
             "spring_ss": spring_ss,
             "node_ss": node_ss,
-            "cell": self.cell,
+            "cell_initial": cell_initial,
+            "cell_final": self.cell,
         }
-
-    def plot_cell(self, title=""):
-        import matplotlib.pyplot as plt
-
-        fig, ax = plt.subplots(1, 1, figsize=(5, 5))
-        polar_set = set(id(n) for n in self.cell.polar_nodes)
-
-        for s in self.cell.springs:
-            p1, p2 = s.node_1.pos, s.node_2.pos
-            ax.plot([p1[0], p2[0]], [p1[1], p2[1]], "b-", linewidth=1.2, alpha=0.6)
-
-        for n in self.cell.nodes:
-            colour = "red" if id(n) in polar_set else "steelblue"
-            ax.scatter(*n.pos, c=colour, s=50, zorder=4)
-            ax.text(n.pos[0] + 0.02, n.pos[1] + 0.02, str(n.id), fontsize=8)
-
-        ax.scatter(*self.cell.centroid, marker="x", c="gray", s=60, zorder=5)
-        ax.set_aspect("equal")
-        ax.axhline(0, color="gray", linewidth=0.4, linestyle="--")
-        ax.axvline(0, color="gray", linewidth=0.4, linestyle="--")
-        ax.set_title(title or "cell shape")
-        ax.grid(True, alpha=0.15)
-        plt.tight_layout()
-        plt.show()

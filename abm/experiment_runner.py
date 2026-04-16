@@ -108,7 +108,7 @@ class ExperimentRunner:
     # ------------------------------------------------------------------
     # Single Perturbation Experiment Runner
     # ------------------------------------------------------------------
-    def run_single(self, perturbation="WT", plot=False, **user_kwargs):
+    def run_single(self, perturbation="WT", **user_kwargs):
         """
         Run one perturbation and return its result.
 
@@ -116,14 +116,14 @@ class ExperimentRunner:
         """
         cfg = self.build_cfg(perturbation=perturbation, **user_kwargs)
 
-        sim = Simulation(cfg=cfg, lut=self.lut,perturbation=perturbation, plot=plot)
+        sim = Simulation(cfg=cfg, lut=self.lut,perturbation=perturbation)
 
         return sim.run()
 
     # ------------------------------------------------------------------
     # Full Perturbation Experiment Runner
     # ------------------------------------------------------------------
-    def run_all(self, result_dir=None, plot=False, **user_kwargs):
+    def run_all(self, result_dir=None, **user_kwargs):
         """
         Run all perturbations defined in the base config.
 
@@ -132,34 +132,40 @@ class ExperimentRunner:
         """
         perturbations = require(self.base_cfg, "perturbations")
 
-        cell_dfs, spring_dfs, node_dfs, ss_rows = [], [], [], []
+        cell_dfs, spring_dfs, node_dfs = [], [], []
+        cell_ss_rows, spring_ss_rows, node_ss_rows = [], [], []
         results = {}
 
         for perturbation in perturbations:
-            result = self.run_single(perturbation=perturbation, plot=plot, **user_kwargs)
+            result = self.run_single(perturbation=perturbation, **user_kwargs)
             results[perturbation] = result
 
             cell_dfs.append(result["cell_df"])
             spring_dfs.append(result["spring_df"])
             node_dfs.append(result["node_df"])
-            ss_rows.append(result["cell_ss"])
+            cell_ss_rows.append(result["cell_ss"])
+            spring_ss_rows.extend(result["spring_ss"])
+            node_ss_rows.extend(result["node_ss"])
 
         cell_ts_df = pd.concat(cell_dfs, ignore_index=True)
         spring_ts_df = pd.concat(spring_dfs, ignore_index=True)
         node_ts_df = pd.concat(node_dfs, ignore_index=True)
-        ss_df = pd.DataFrame(ss_rows)
+        cell_ss_df = pd.DataFrame(cell_ss_rows)
+        spring_ss_df = pd.DataFrame(spring_ss_rows)
+        node_ss_df = pd.DataFrame(node_ss_rows)
 
         if result_dir is not None:
             save_df_to_csv(cell_ts_df, result_dir, "abm_cell_timeseries", ts=False)
             save_df_to_csv(spring_ts_df, result_dir, "abm_spring_timeseries", ts=False)
             save_df_to_csv(node_ts_df, result_dir, "abm_node_timeseries", ts=False)
-            save_df_to_csv(ss_df, result_dir, "abm_steady_state", ts=False)
+            save_df_to_csv(cell_ss_df, result_dir, "abm_cell_steady_state", ts=False)
+            save_df_to_csv(spring_ss_df, result_dir, "abm_spring_steady_state", ts=False)
+            save_df_to_csv(node_ss_df, result_dir, "abm_node_steady_state", ts=False)
             print(f">>> INFO: Results saved to {result_dir}")
 
         return {
             "results_by_perturbation": results,
-            "cell_ts_df": cell_ts_df,
-            "spring_ts_df": spring_ts_df,
-            "node_ts_df": node_ts_df,
-            "ss_df": ss_df,
+            "cell_ss_df": cell_ss_df,
+            "spring_ss_df": spring_ss_df,
+            "node_ss_df": node_ss_df,
         }

@@ -3,8 +3,8 @@
 # Thin entry script for the experiment.
 #
 # Example use:
-#   python -m abm.scripts.run_abm_sim single WT
-#   python -m abm.scripts.run_abm_sim all
+#   python -m scripts.run_abm_sim single WT
+#   python -m scripts.run_abm_sim all
 #
 
 import sys
