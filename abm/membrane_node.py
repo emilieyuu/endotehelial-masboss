@@ -13,7 +13,7 @@ from abm.helpers.signalling import get_protein_recruitment
 from abm.helpers.mechanics import overdamped_step
 from src.utils import require
 
-class MemAgent:
+class MembraneNode:
     """
     A single membrane node: position, accumulated force, signalling state.
     """
@@ -29,7 +29,7 @@ class MemAgent:
 
         # --- Load channels (signalling stimuli) --
         self.tensile_load = 0.0 # tensile stimulus (cortex + SF + flow baseline)
-        self.shear_total = 0.0 # shear stimulus (flow magnitude)
+        self.shear_load = 0.0 # shear stimulus (flow magnitude)
 
         # --- Signalling ---
         self.lut = lut
@@ -60,7 +60,7 @@ class MemAgent:
         # Clamp mechanical loads to non-negatice
         S_dsp  = max(self.tensile_load, 0.0)
         S_tjp1 = max(self.tensile_load, 0.0) 
-        S_jcad = max(self.shear_total, 0.0) 
+        S_jcad = max(self.shear_load, 0.0) 
 
         # Hill → junction protein recruitment
         self.DSP  = get_protein_recruitment(self.cfg, S_dsp, 'DSP')
@@ -85,7 +85,7 @@ class MemAgent:
         
         # Reset load channels and force before next step
         self.tensile_load = 0.0
-        self.shear_total = 0.0
+        self.shear_load = 0.0
         self.force[:] = 0.0
 
     # ------------------------------------------------------------------
@@ -108,7 +108,7 @@ class MemAgent:
             'id': self.id, 
             'position': (self.pos[0].round(2), self.pos[1].round(2)), 
             'tensile_load': self.tensile_load, 
-            'shear_total': self.shear_total, 
+            'shear_load': self.shear_load, 
             'DSP': self.DSP, 
             'TJP1': self.TJP1, 
             'JCAD': self.JCAD, 

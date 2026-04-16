@@ -15,7 +15,7 @@ import time
 import pandas as pd
 
 from abm.flow_field import FlowField
-from abm.cell_agent import CellAgent
+from abm.cell import Cell
 from abm.analysis.cell_measurement import measure_cell, measure_springs, measure_nodes
 from src.utils import require
 
@@ -40,7 +40,7 @@ class Simulation:
 
         # --- Runtime objects ---
         self.flow = FlowField(cfg)
-        self.cell = CellAgent(
+        self.cell = Cell(
             cell_id=0,
             flow_axis=self.flow.direction,
             lut=lut,

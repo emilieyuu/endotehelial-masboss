@@ -11,7 +11,7 @@ from abm.helpers.mechanics import bilinear_tension, relax_toward
 from abm.helpers.geometry import axial_coord, lateral_coord, perpendicular
 from src.utils import require
 
-class SfCable:
+class StressFibreCable:
     """
     Contractile stress fibre cable along flow axis, 
     connects upstream and downstream poles. 

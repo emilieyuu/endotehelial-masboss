@@ -13,9 +13,9 @@
 
 import numpy as np
 
-from abm.membrane_agent import MemAgent
+from abm.membrane_node import MembraneNode
 from abm.cortex_spring import CortexSpring
-from abm.sf_cable import SfCable
+from abm.sf_cable import StressFibreCable
 
 from abm.helpers.geometry import (
     axial_coord, polar_mask, 
@@ -24,7 +24,7 @@ from abm.helpers.geometry import (
 
 from src.utils import require
 
-class CellAgent:
+class Cell:
     """
     Closed-ring polygonal cell with cortex springs and one stress fibre.
 
@@ -75,7 +75,7 @@ class CellAgent:
         nodes  = []
         for i, angle in enumerate(angles):
             pos = centroid + radius * np.array([np.cos(angle), np.sin(angle)])
-            nodes.append(MemAgent(i, pos, self.lut, cfg))
+            nodes.append(MembraneNode(i, pos, self.lut, cfg))
         return nodes
 
     def _init_springs(self, cfg):
@@ -98,7 +98,7 @@ class CellAgent:
         dn_id = int(np.argmax(projections))
         L_rest = projections.max() - projections.min()
 
-        return SfCable(
+        return StressFibreCable(
             node_up=self.nodes[up_id],
             node_down=self.nodes[dn_id],
             nodes=self.nodes,
@@ -245,7 +245,7 @@ class CellAgent:
         # 1. External stimuli from flow
         self._apply_shear_drag(flow_field)
         for node in self.nodes:
-            node.shear_total  = flow_field.magnitude
+            node.shear_load = flow_field.magnitude
             node.tensile_load += flow_field.magnitude
 
         # 2. Geometry + tension 
