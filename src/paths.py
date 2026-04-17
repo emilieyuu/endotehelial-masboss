@@ -23,7 +23,7 @@ PERB_FIG_DIR = BM_FIG_DIR / "perturbation_figs"
 ABM_SIM_RES_DIR = RESULTS_DIR / "abm_sim"
 ABM_SWEEP_RES_DIR = RESULTS_DIR / "abm_sweep"
 
-HILL_RES_DIR = RESULTS_DIR / "analyse_hill"
+ABM_FIG_DIR = FIGURES_DIR / "abm_figs"
 
 # Russ Experimental Data
 EXP_DIR = PROJECT_ROOT / "russ_results" / "Elongation"

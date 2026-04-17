@@ -187,17 +187,6 @@ class Cell:
             force = flow.drag_on_node(weight=w, axial_sign=np.sign(a))
             node.apply_force(force)
             
-        # polar = self.polar_nodes
-        # if not polar:
-        #     return
-        
-        # # Signed axial coordinates
-        # polar_positions = np.array([n.pos for n in polar])
-        # axial = axial_coord(polar_positions, self.centroid, self.flow_axis)
-
-        # for node, a in zip(polar, axial):
-        #     force = flow.drag_on_node(weight=1.0, axial_sign=np.sign(a))
-        #     node.apply_force(force)
 
     def _apply_pressure(self):
         """
@@ -242,11 +231,14 @@ class Cell:
         Forces accumulate before integration. Signalling reads
         post-integration geometry. Remodelling sets state for next step.
         """
+        # Reset Tensile Loads
+        for n in self.nodes:
+            n.reset_tensile_load()
+
         # 1. External stimuli from flow
-        self._apply_shear_drag(flow_field)
         for node in self.nodes:
             node.shear_load = flow_field.magnitude
-            node.tensile_load += flow_field.magnitude
+            #node.tensile_load += flow_field.magnitude
 
         # 2. Geometry + tension 
         for s in self.springs:

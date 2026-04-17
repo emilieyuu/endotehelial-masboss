@@ -38,6 +38,10 @@ class MembraneNode:
         self.DSP, self.TJP1, self.JCAD = 0.0, 0.0, 0.0
         self.rhoa, self.rhoc = 0.0,  0.0
 
+    def reset_tensile_load(self):
+        """Converts net force to displacement."""
+        self.tensile_load = 0.0
+
     # ------------------------------------------------------------------
     # Integration — called once per step after all forces are accumulated
     # ------------------------------------------------------------------
@@ -84,8 +88,8 @@ class MembraneNode:
         self._update_signalling()
         
         # Reset load channels and force before next step
-        self.tensile_load = 0.0
-        self.shear_load = 0.0
+        # self.tensile_load = 0.0
+        # self.shear_load = 0.0
         self.force[:] = 0.0
 
     # ------------------------------------------------------------------
@@ -106,7 +110,7 @@ class MembraneNode:
     def get_state(self):
         return {
             'id': self.id, 
-            'position': (self.pos[0].round(2), self.pos[1].round(2)), 
+            'position': (float(self.pos[0].round(2)), float(self.pos[1].round(2))), 
             'tensile_load': self.tensile_load, 
             'shear_load': self.shear_load, 
             'DSP': self.DSP, 

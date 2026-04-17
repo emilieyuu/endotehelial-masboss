@@ -96,28 +96,24 @@ def measure_cell(cell):
         'rhoa_mean':         round(rhoa_mean, 3),
         'rhoc_mean':         round(rhoc_mean, 3),
         'rho_balance':       round(rhoc_mean - rhoa_mean, 3),
-        'rhoa_polar':        safe_mean([n.rhoa for n in polar_n]),
-        'rhoa_lateral':      safe_mean([n.rhoa for n in lateral_n]),
+        'rhoa_ratio':        safe_mean([n.rhoa for n in polar_n]) / (safe_mean([n.rhoa for n in lateral_n]) + 1e-10),
 
         # --- signalling: recruitment ---
         'dsp_mean':          safe_mean([n.DSP  for n in cell.nodes]),
         'tjp1_mean':         safe_mean([n.TJP1 for n in cell.nodes]),
         'jcad_mean':         safe_mean([n.JCAD for n in cell.nodes]),
-        'dsp_polar':         safe_mean([n.DSP  for n in polar_n]),
-        'dsp_lateral':       safe_mean([n.DSP  for n in lateral_n]),
+        'dsp_ratio':         safe_mean([n.DSP  for n in polar_n]) / (safe_mean([n.DSP  for n in lateral_n]) + 1e-10),
 
         # --- cortex mechanics ---
-        'cortex_T_polar':    safe_mean([s.T for s in polar_s]),
-        'cortex_T_lateral':  safe_mean([s.T for s in lateral_s]),
-        'cortex_k_polar':    safe_mean([s.k for s in polar_s]),
-        'cortex_k_lateral':  safe_mean([s.k for s in lateral_s]),
+        'cortex_T_ratio':    safe_mean([s.T for s in polar_s]) / (safe_mean([s.T for s in lateral_s]) + 1e-10),
+        'cortex_k_ratio':    safe_mean([s.k for s in polar_s]) / (safe_mean([s.k for s in lateral_s]) + 1e-10),
         'cortex_a_mean':     safe_mean([s.a for s in cell.springs]),
 
         # --- stress fibre mechanics ---
         'sf_T':              round(cell.sf.T, 4),
         'sf_a':              round(cell.sf.a, 3),
         'sf_k':              round(cell.sf.k, 4),
-        'sf_squeeze_total':  round(cell.sf.T * cell.sf.nu, 4),
+        'sf_squeeze':  round(cell.sf.T * cell.sf.nu, 4),
     }
 
 # ------------------------------------------------------------------

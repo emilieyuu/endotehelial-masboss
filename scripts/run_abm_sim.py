@@ -21,13 +21,13 @@ def main():
 
     if mode == 'single':
         perturbation = sys.argv[2] if len(sys.argv) > 2 else 'WT'
-        result = runner.run_single(perturbation=perturbation, plot=True)
+        result = runner.run_single(perturbation=perturbation)
 
         print(f">>> INFO: Finished single perturbation: {perturbation}")
         return result
 
     if mode == 'all':
-        result = runner.run_all(result_dir=ABM_SIM_RES_DIR, plot=False)
+        result = runner.run_all(result_dir=ABM_SIM_RES_DIR)
 
         print(">>> INFO: Finished all perturbations.")
         return result

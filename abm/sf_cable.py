@@ -142,6 +142,7 @@ class StressFibreCable:
             direction = -np.sign(lat) * perp_unit
             node.apply_force(w * F_total * direction)
 
+            perp_unit = perpendicular(self.axis_unit)
    
     # ------------------------------------------------------------------
     # 4. Remodelling (called each step after signalling)
