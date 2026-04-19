@@ -8,7 +8,7 @@
 #   2. Signalling: uniform shear stimulus at every node (magnitude)
 
 import numpy as np
-from src.utils import require
+from src.utils.config_utils import require
 
 class FlowField:
     """External flow acting on membrane nodes."""
@@ -18,10 +18,6 @@ class FlowField:
         # Magnitude clamped to non-negative 
         self.magnitude = max(require(flow_cfg, 'magnitude'), 0.0)
 
-        # Drag force magnitude
-        drag_frac = require(flow_cfg, 'drag_fraction')
-        self.drag = self.magnitude * drag_frac
-
         # Normalised flow direction
         direction = np.asarray(require(flow_cfg, 'direction'), dtype=float)
         norm = np.linalg.norm(direction)
@@ -30,17 +26,6 @@ class FlowField:
             raise ValueError("Flow direction cannot be zero vector.")
         
         self.direction = direction / norm
-    
-    def drag_on_node(self, weight, axial_sign):
-        """
-        Drag force on a single node.
-
-        weight: polarity weight in [0, 1] 
-        axial_sign: ±1, tells us pole of node 
-
-        Returns: 2D force vector along ±direction.
-        """
-        return weight * self.drag * axial_sign * self.direction
 
     def __repr__(self):
         return (

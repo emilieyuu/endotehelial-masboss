@@ -18,7 +18,7 @@ import copy
 from abm.flow_field import FlowField
 from abm.cell import Cell
 from abm.analysis.cell_measurement import measure_cell, measure_springs, measure_nodes
-from src.utils import require
+from src.utils.config_utils import require
 
 class Simulation:
     """

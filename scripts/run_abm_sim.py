@@ -11,7 +11,7 @@ import sys
 
 from src.config import load_abm_sim_cfg
 from src.paths import BM_RESULTS_DIR, ABM_SIM_RES_DIR
-from abm.experiment_runner import ExperimentRunner
+from abm.experiments.experiment_runner import ExperimentRunner
 
 def main():
     sim_cfg = load_abm_sim_cfg()

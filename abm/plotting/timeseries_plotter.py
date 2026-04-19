@@ -5,21 +5,15 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-PERTURBATION_ORDER = [
-    "WT",
-    "DSP_KO",
-    "TJP1_KO",
-    "JCAD_KO",
-    "DSP_JCAD_DKO",
-    "TJP1_JCAD_DKO",
-]
 
 PERTURBATION_COLOURS = {
-    "WT": "black",
     "DSP_KO": "tab:blue",
-    "TJP1_KO": "tab:red",
-    "JCAD_KO": "tab:green",
     "DSP_JCAD_DKO": "tab:purple",
+
+    "WT": "tab:gray",
+    "JCAD_KO": "tab:green",
+
+    "TJP1_KO": "tab:red",
     "TJP1_JCAD_DKO": "tab:orange",
 }
 
@@ -27,11 +21,16 @@ PERTURBATION_COLOURS = {
 # Helpers
 # ------------------------------------------------------------------
 def _prepare_plot_df(df, y_col):
-    """Return copy of df with perbs as ordered categorical."""
+    """Return copy of df with perturbations ordered by colour dict."""
     df = df.copy()
+
+    order = list(PERTURBATION_COLOURS.keys())
+
+    df = df[df["perturbation"].isin(order)]
     df["perturbation"] = pd.Categorical(
-        df["perturbation"], categories=PERTURBATION_ORDER, ordered=True,
+        df["perturbation"], categories=order, ordered=True,
     )
+
     df = df.sort_values(["perturbation", "time"])
 
     if y_col not in df.columns:
@@ -61,13 +60,16 @@ def plot_metric_timeseries(df, y_col, y_label,
         fig, ax = plt.subplots(figsize=(7, 4.5))
         created_fig = True
 
-    for perturbation in PERTURBATION_ORDER:
+    for perturbation, colour in PERTURBATION_COLOURS.items():
         sub = df[df["perturbation"] == perturbation]
         if sub.empty:
             continue
 
-        ax.plot(sub["time"], sub[y_col], label=perturbation,
-            color=PERTURBATION_COLOURS[perturbation], linewidth=2.0,
+        ax.plot(
+            sub["time"], sub[y_col],
+            label=perturbation,
+            color=colour,
+            linewidth=2.0,
         )
 
     ax.set_xlabel("Time")
@@ -89,7 +91,71 @@ def plot_metric_timeseries(df, y_col, y_label,
         plt.show()
 
 # ------------------------------------------------------------------
-# Convenience wrappers
+# Steady-State bar chart
+# ------------------------------------------------------------------
+def plot_ss_ar_bars(cell_ss_df, outdir=None):
+    """
+    Steady-state AR bar chart using colour dict for BOTH ordering and colours.
+    """
+
+    df = cell_ss_df.copy()
+
+    # --- Enforce ordering from colour dict ---
+    order = list(PERTURBATION_COLOURS.keys())
+    df = df[df["perturbation"].isin(order)]
+    df["perturbation"] = pd.Categorical(df["perturbation"], categories=order, ordered=True)
+    df = df.sort_values("perturbation")
+
+    labels = df["perturbation"].values
+    values = df["ar"].values
+    colors = [PERTURBATION_COLOURS[p] for p in labels]
+
+    # --- Plot ---
+    fig, ax = plt.subplots(figsize=(7.5, 4))
+
+    bars = ax.bar(
+        labels,
+        values,
+        color=colors,
+        edgecolor="black",
+        linewidth=0.8,
+    )
+
+    # --- Value labels ---
+    for bar, val in zip(bars, values):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            val + 0.02,
+            f"{val:.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+
+    # --- WT reference line ---
+    if "WT" in df["perturbation"].values:
+        wt_ar = df.loc[df["perturbation"] == "WT", "ar"].iloc[0]
+        ax.axhline(wt_ar, linestyle="--", linewidth=1.0, color="black", alpha=0.6)
+
+    # --- Formatting ---
+    ax.set_ylabel("Aspect ratio (AR)")
+    ax.set_title("Steady-state elongation")
+    ax.grid(True, axis="y", alpha=0.2)
+
+    ax.set_ticks(6)
+    ax.set_xticklabels(labels, rotation=30, ha="right")
+
+    plt.tight_layout()
+
+    if outdir is not None:
+        outpath = Path(outdir / f"steady_state_bar.png")
+        plt.savefig(outpath, dpi=300, bbox_inches="tight")
+
+    plt.show()
+
+
+# ------------------------------------------------------------------
+# Wrappers -- Key Timeseries
 # ------------------------------------------------------------------
 def plot_ar_timeseries(cell_df, outdir=None, ax=None):
     plot_metric_timeseries(
@@ -101,35 +167,34 @@ def plot_ar_timeseries(cell_df, outdir=None, ax=None):
         ax=ax,
     )
 
-
+# --- Signalling ---
 def plot_rho_balance_timeseries(cell_df, outdir=None, ax=None):
     plot_metric_timeseries(
         cell_df,
         y_col="rho_balance",
-        y_label="Δ = RhoC - RhoA",
+        y_label="Δ = RhoA - RhoC",
         title="Rho balance over time",
         outdir=outdir,
         ax=ax,
     )
 
-
+# --- Mechanics ---
 def plot_squeeze_timeseries(cell_df, outdir=None, ax=None):
     plot_metric_timeseries(
         cell_df,
         y_col="sf_squeeze",
-        y_label="SF squeeze force",
+        y_label=r"$T_{sf} \times \nu$",
         title="Stress fibre squeeze over time",
         outdir=outdir,
         ax=ax,
     )
 
-
-def plot_k_ratio_timeseries(cell_df, outdir=None, ax=None):
+def plot_tensions_balance_timeseries(cell_df, outdir=None, ax=None):
     plot_metric_timeseries(
         cell_df,
-        y_col="cortex_k_ratio",
-        y_label=r"$k_{polar} / k_{lateral}$",
-        title="Polar/lateral spring stiffness over time",
+        y_col="tension_balance",
+        y_label=f"log_2(T_sf/T_cortex)",
+        title="Cortex / Stress Fibre tension over time",
         outdir=outdir,
         ax=ax,
     )

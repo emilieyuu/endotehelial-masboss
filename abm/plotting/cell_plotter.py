@@ -75,7 +75,6 @@ def plot_cells_grid(results, outdir=None):
         ax.set_xlim(*x_lim)
         ax.set_ylim(*y_lim)
     
-
     # Shared title
     fig.suptitle("Initial and steady-state cell phenotypes", fontsize=16, y=0.92)
     fig.subplots_adjust(wspace=0.2, hspace=0.2)

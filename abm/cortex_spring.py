@@ -8,7 +8,7 @@
 
 import numpy as np
 from abm.helpers.mechanics import bilinear_tension, relax_toward
-from src.utils import require
+from src.utils.config_utils import require
 
 class CortexSpring:
     """
@@ -37,7 +37,7 @@ class CortexSpring:
 
         # Stiffness: baseline + RhoA-driven stiffening capacity.
         self.k_base = require(mech_cfg, 'k_base')
-        self.k_gain = require(cortex_cfg, 'k_gain') 
+        #self.k_gain = require(cortex_cfg, 'k_gain') 
         self.k = self.k_base # start at baseline
 
         # Shared mechanical paramters
@@ -118,7 +118,7 @@ class CortexSpring:
         mean_rhoa = 0.5 * (self.node_1.rhoa + self.node_2.rhoa)
 
         # Instant stiffness update
-        self.k = self.k_base + (mean_rhoa * self.k_gain)
+        #self.k = self.k_base + (mean_rhoa * self.k_gain)
 
         # First-order relaxation towards RhoA-dependent target activation
         a_target = self.a_base - (mean_rhoa * self.a_drop)

@@ -16,44 +16,50 @@ groups:
   junctions:  ["DSP", "TJP1", "JCAD"]
 
 experiments: 
-  # 1D Experiements
-  - name: "WT_Sweep"
+  # --- 1D Sweeps ---
+  - name: "wt_sweep"
     perturbations: ["WT"]
     type: "1D"
     resolution: "fine"
     parameters: "all"
-  - name: "DSP_Sweep"
+
+  - name: "dsp_sweep"
     perturbations: ["DSP_KO"]
     type: "1D"
     resolution: "fine"
     parameters: ["$RhoC_antagonistic", "$RhoC_mod", "$RhoC_amp", "$RhoC_decay"]
-  - name: "TJP1_Sweep"
+
+  - name: "tjp1_sweep"
     perturbations: ["TJP1_KO"]
     type: "1D"
     resolution: "fine"
     parameters: ["$RhoA_antagonistic", "$RhoA_mod", "$RhoA_amp", "$RhoA_decay"]
-  - name: "JCAD_Sweep"
+
+  - name: "jcad_sweep"
     perturbations: ["JCAD_KO"]
     type: "1D"
     resolution: "fine"
     parameters: ["$RhoA_mod", "$RhoC_mod", "$RhoA_basal", "$RhoC_basal"]
+
   - name: "DSP_JCAD_Sweep"
     perturbations: ["DSP_JCAD_DKO"]
     type: "1D"
     resolution: "fine"
     parameters: ["$RhoC_mod", "$RhoC_basal", "$RhoA_basal"]
+
   - name: "TJP1_JCAD_Sweep"
     perturbations: ["TJP1_JCAD_DKO"]
     type: "1D"
     resolution: "fine"
     parameters: ["$RhoA_mod", "$RhoA_basal", "$RhoC_basal"]
+
   - name: "DSP_TJP1_Sweep"
     perturbations: ["DSP_TJP1_DKO"]
     type: "1D"
     resolution: "fine"
     parameters: ["$RhoA_basal", "$RhoC_basal"]
 
-  # --- 2D Experiments ---
+  # --- 2D Sweeps ---
   - name: "Competition_Landscape"
     perturbations: ["WT", "TJP1_KO", "DSP_KO"]
     type: "2D"
@@ -92,14 +98,14 @@ experiments:
     resolution: "coarse"
     parameters: ["$RhoC_mod", "$RhoC_basal"]
   
-  - name: "Basal_Activity_Robustness"
+  - name: "basal_activity_robustness"
     perturbations: ["WT"]
     type: "2D"
     resolution: "coarse"
     parameters: ["$RhoA_basal", "$RhoC_basal"]
   
-  # --- 3D Experiment ---
-  - name: "Joint_Recr_Sweep"
+  # --- 3D Sweeps ---
+  - name: "recruitment_sweep"
     perturbations: ["WT"]
     type: "3D"
     resolution: "coarse"

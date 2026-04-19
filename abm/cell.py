@@ -22,7 +22,7 @@ from abm.helpers.geometry import (
     polygon_area, polygon_outward_normals, polygon_arc_lengths
 )
 
-from src.utils import require
+from src.utils.config_utils import require
 
 class Cell:
     """
@@ -218,57 +218,56 @@ class Cell:
 
         Phase order:
         1. Reset accumulators
-        2. External forces (flow drag, signalling stimulus)
+        2. External forces (flow)
         3. Update mechanical geometry and tensions (cortex, SF)
         4. Accumulate tensile stimuli on nodes (cortex, SF)
         5. Apply mechanical forces (cortex, SF)
         6. Area pressure
-        7. Integration (node positions advance)
-        8. Signalling (Hill → LUT → Rho)
+        7. Integration and signalling for nodes 
         9. Remodelling (cortex stiffness/activation, SF activation)
         10. Sync current_area for next step's pressure
 
         Forces accumulate before integration. Signalling reads
         post-integration geometry. Remodelling sets state for next step.
         """
-        # Reset Tensile Loads
+        # 1. Reset Tensile Loads
         for n in self.nodes:
             n.reset_tensile_load()
+            n.reset_force()
 
-        # 1. External stimuli from flow
+        # 2. External stimuli from flow
         for node in self.nodes:
             node.shear_load = flow_field.magnitude
-            #node.tensile_load += flow_field.magnitude
 
-        # 2. Geometry + tension 
+        # 3. Geometry + tension 
         for s in self.springs:
             s.update_geometry_tension()
         self.sf.update_geometry_tension()
 
-        # 3. Tensile stimuli to load channels
+        # 4. Tensile stimuli to load channels
         for s in self.springs:
             s.accumulate_loads()
         self.sf.accumulate_loads(self.polar_nodes)
 
-        # 4. Mechanical forces applied to nodes
+        # 5. Mechanical forces applied to nodes
         for s in self.springs:
             s.apply_forces()
         self.sf.apply_forces()
 
-        # 5. Area pressure
+        # 6. Area pressure
         self.current_area = polygon_area(self.positions)
         self._apply_pressure()
 
-         # 6. Integration — each node advances by its net force
+         # 7. Integration — each node advances by its net force
         for node in self.nodes:
             node.step(dt)
 
-        # 7. Remodelling — cortex reads local RhoA, SF reads cell-wide RhoC mean
+        # 8. Remodelling — cortex reads local RhoA, SF reads cell-wide RhoC mean
         for s in self.springs:
             s.update_stiffness_and_activation(dt)
         self.sf.update_activation(mean_rhoc=self.rhoc_mean, dt=dt)
 
-        # 8. Sync area for next step's pressure calculation
+        # 9. Sync area for next step's pressure calculation
         self.current_area = polygon_area(self.positions)
  
     # ------------------------------------------------------------------

@@ -14,7 +14,8 @@ import pandas as pd
 
 from abm.rho_lookup_table import RhoLookupTable
 from abm.simulation import Simulation
-from src.utils import require, save_df_to_csv
+from src.utils.config_utils import require
+from src.utils.file_utils import save_df_to_csv
 
 
 class ExperimentRunner:
@@ -155,17 +156,20 @@ class ExperimentRunner:
         node_ss_df = pd.DataFrame(node_ss_rows)
 
         if result_dir is not None:
-            save_df_to_csv(cell_ts_df, result_dir, "abm_cell_timeseries", ts=True)
-            save_df_to_csv(spring_ts_df, result_dir, "abm_spring_timeseries", ts=True)
-            save_df_to_csv(node_ts_df, result_dir, "abm_node_timeseries", ts=True)
-            save_df_to_csv(cell_ss_df, result_dir, "abm_cell_steady_state", ts=True)
-            save_df_to_csv(spring_ss_df, result_dir, "abm_spring_steady_state", ts=True)
-            save_df_to_csv(node_ss_df, result_dir, "abm_node_steady_state", ts=True)
+            save_df_to_csv(cell_ts_df, result_dir, "abm_cell_timeseries", ts=False)
+            save_df_to_csv(spring_ts_df, result_dir, "abm_spring_timeseries", ts=False)
+            save_df_to_csv(node_ts_df, result_dir, "abm_node_timeseries", ts=False)
+            save_df_to_csv(cell_ss_df, result_dir, "abm_cell_steady_state", ts=False)
+            save_df_to_csv(spring_ss_df, result_dir, "abm_spring_steady_state", ts=False)
+            save_df_to_csv(node_ss_df, result_dir, "abm_node_steady_state", ts=False)
             print(f">>> INFO: Results saved to {result_dir}")
 
         return {
             "results_by_perturbation": results,
             "cell_ts_df": cell_ts_df,
             "cell_ss_df": cell_ss_df,
-            "spring_ss_df": spring_ss_df
+            "spring_ts_df": spring_ts_df,
+            "spring_ss_df": spring_ss_df,
+            "node_ts_df": node_ts_df,
+            "node_ss_df": node_ss_df
         }

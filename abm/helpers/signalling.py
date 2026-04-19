@@ -1,7 +1,7 @@
 # abm/helpers/signalling.py
 #
 # Signalling functions: map mechanical inputs to protein recruitment.
-from src.utils import require
+from src.utils.config_utils import require
 
 def hill(S, K, n):
     """

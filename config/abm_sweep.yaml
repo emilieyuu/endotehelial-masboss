@@ -2,28 +2,19 @@
 
 experiment: "abm_parameter_sweep"
 
-sweep: 
-  n_steps: 1500 # 150 minutes
-  result_dir: "ABM_RESULT_DIR"
+sweeps:
+  - name: "k_base_sweep"
+    perturbations: "all"
+    type: "1D"
+    parameters:
+      - path: ["mechanics", "k_base"]
+        values: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
 
-# Range of values with parameters
-param_ranges: 
-  f_magnitude: [8.0, 10.0, 12.0, 14.0]
-  rhoa_k_gain: [8.0, 10.0, 12.0, 15.0]
-  rhoc_protrusion_gain: [3.0, 4.0, 5.0, 6.0]
-
-# Experiment AR targets for scoring
-exp_targets: 
-  WT: 5.403
-  DSP_KO: 7.047
-  TJP1_KO: 3.371
-  JCAD_KO: 5.437
-  DSP_JCAD_DKO: 6.224
-  TJP1_JCAD_DKO: 4.040
-
-# Ordering Constraints
-ordering_constraints:
-  - [TJP1_KO, WT]
-  - [WT, DSP_KO]
-  - [DSP_JCAD_DKO, DSP_KO]
-  - [TJP1_KO, TJP1_JCAD_DKO]
+  - name: "contractility_competition"
+    perturbations: "all"
+    type: "2D"
+    parameters:
+      - path: ["cortex", "a_drop"]
+        values: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+      - path: ["stress_fibre", "a_drop"]
+        values: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]

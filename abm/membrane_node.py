@@ -11,7 +11,7 @@
 import numpy as np
 from abm.helpers.signalling import get_protein_recruitment
 from abm.helpers.mechanics import overdamped_step
-from src.utils import require
+from src.utils.config_utils import require
 
 class MembraneNode:
     """
@@ -41,6 +41,10 @@ class MembraneNode:
     def reset_tensile_load(self):
         """Converts net force to displacement."""
         self.tensile_load = 0.0
+
+    def reset_force(self):
+        """Converts net force to displacement."""
+        self.force[:] = 0.0
 
     # ------------------------------------------------------------------
     # Integration — called once per step after all forces are accumulated
@@ -86,11 +90,6 @@ class MembraneNode:
         """
         self._update_position(dt)
         self._update_signalling()
-        
-        # Reset load channels and force before next step
-        # self.tensile_load = 0.0
-        # self.shear_load = 0.0
-        self.force[:] = 0.0
 
     # ------------------------------------------------------------------
     # Accumulators — called by springs, stress fibre, flow

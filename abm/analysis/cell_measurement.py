@@ -4,7 +4,14 @@
 
 import numpy as np
 from abm.helpers.geometry import polar_mask, axial_coord, lateral_coord
-from src.utils import safe_mean
+
+def safe_mean(lst):
+    mean = float(np.mean(lst)) if lst else 0.0
+    return round(mean, 3)
+
+def log_ratio(val1, val2, eps=1e-10):
+    log_r = np.log2((val1 + eps) / (val2 + eps))
+    return round(log_r, 3)
 
 # ------------------------------------------------------------------
 # Shape
@@ -74,8 +81,28 @@ def measure_cell(cell):
     shape = measure_shape(cell)
 
     # ---- signalling: Rho ----
-    rhoa_mean = float(np.mean([n.rhoa for n in cell.nodes]))
-    rhoc_mean = float(np.mean([n.rhoc for n in cell.nodes]))
+    rhoa_mean = safe_mean([n.rhoa for n in cell.nodes])
+    rhoc_mean = safe_mean([n.rhoc for n in cell.nodes])
+
+    # ---- signalling: Junction proteins ----
+    dsp_mean = safe_mean([n.DSP  for n in cell.nodes])
+    tjp1_mean = safe_mean([n.TJP1 for n in cell.nodes])
+
+    dsp_polar = safe_mean([n.DSP  for n in polar_n])
+    dsp_lateral = safe_mean([n.DSP  for n in lateral_n])
+    tjp1_polar = safe_mean([n.TJP1  for n in polar_n])
+    tjp1_lateral = safe_mean([n.TJP1  for n in lateral_n])
+
+    # --- mechanics ---
+    t_polar = safe_mean([s.T for s in polar_s])
+    t_lateral = safe_mean([s.T for s in lateral_s])
+
+
+    cortex_a_mean = safe_mean([s.a for s in cell.springs])
+    cortex_T_mean = safe_mean([s.T for s in cell.springs])
+
+    sf_a = round(cell.sf.a, 3)
+    sf_T = round(cell.sf.T, 3)
 
     return {
         # --- identifiers ---
@@ -84,36 +111,41 @@ def measure_cell(cell):
         # --- shape ---
         'ar':                shape['ar'],
         'area_ratio':        shape['area_ratio'],
-        'perimeter':         shape['perimeter'],
+#        'perimeter':         shape['perimeter'],
         'major':             shape['major'],
         'minor':             shape['minor'],
+
+        # --- signalling: Loading & Rho ---
+        'rhoa_mean':         rhoa_mean,
+        'rhoc_mean':         rhoc_mean,
+        'rho_balance':       round(rhoa_mean - rhoc_mean, 3),
+
+        # --- signalling: recruitment ---
+        'dsp_mean':          dsp_mean,
+        'tjp1_mean':         tjp1_mean,
+        'jcad_mean':         safe_mean([n.JCAD for n in cell.nodes]),
+
+        'tjp1_dsp_balance':  round(dsp_mean - tjp1_mean, 3),
+        'dsp_spread':        log_ratio(dsp_polar, dsp_lateral),
+        'tjp1_spread':       log_ratio(tjp1_polar, tjp1_lateral),
 
         # --- loading ---
         't_load_polar':      safe_mean([n.tensile_load for n in polar_n]),
         't_load_lat':        safe_mean([n.tensile_load for n in lateral_n]),
 
-        # --- signalling: Loading & Rho ---
-        'rhoa_mean':         round(rhoa_mean, 3),
-        'rhoc_mean':         round(rhoc_mean, 3),
-        'rho_balance':       round(rhoc_mean - rhoa_mean, 3),
-        'rhoa_ratio':        safe_mean([n.rhoa for n in polar_n]) / (safe_mean([n.rhoa for n in lateral_n]) + 1e-10),
-
-        # --- signalling: recruitment ---
-        'dsp_mean':          safe_mean([n.DSP  for n in cell.nodes]),
-        'tjp1_mean':         safe_mean([n.TJP1 for n in cell.nodes]),
-        'jcad_mean':         safe_mean([n.JCAD for n in cell.nodes]),
-        'dsp_ratio':         safe_mean([n.DSP  for n in polar_n]) / (safe_mean([n.DSP  for n in lateral_n]) + 1e-10),
-
         # --- cortex mechanics ---
-        'cortex_T_ratio':    safe_mean([s.T for s in polar_s]) / (safe_mean([s.T for s in lateral_s]) + 1e-10),
-        'cortex_k_ratio':    safe_mean([s.k for s in polar_s]) / (safe_mean([s.k for s in lateral_s]) + 1e-10),
-        'cortex_a_mean':     safe_mean([s.a for s in cell.springs]),
+        'cortex_T_mean':         cortex_T_mean,
+        'cortex_a_mean':         cortex_a_mean,
+        'cortex_force_spread':   log_ratio(t_polar, t_lateral),
 
         # --- stress fibre mechanics ---
-        'sf_T':              round(cell.sf.T, 4),
-        'sf_a':              round(cell.sf.a, 3),
-        'sf_k':              round(cell.sf.k, 4),
-        'sf_squeeze':  round(cell.sf.T * cell.sf.nu, 4),
+        'sf_T':              sf_T,
+        'sf_a':              sf_a,
+        'sf_squeeze':        round(sf_T * cell.sf.nu, 3),
+
+        # --- mechanics balance ---
+        'activation_balance': cortex_a_mean - sf_a,
+        'tension_balance':    log_ratio(cortex_T_mean, sf_T),
     }
 
 # ------------------------------------------------------------------

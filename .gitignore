@@ -10,6 +10,10 @@
 # Ignore experimental data
 russ_results/*
 
+# Ignore reproducible results and figures
+results/*
+figures/*
+
 # User-specific files
 *.rsuser
 *.suo
