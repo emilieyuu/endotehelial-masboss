@@ -9,13 +9,13 @@
 
 import sys
 
-from src.config import load_abm_sim_cfg
-from src.paths import BM_RESULTS_DIR, ABM_SIM_RES_DIR
-from abm.experiments.experiment_runner import ExperimentRunner
+from src.config_loader import load_abm_sim_cfg
+from src.paths import LUT_DIR, ABM_SIM_RES_DIR
+from src.abm.experiments.experiment_runner import ExperimentRunner
 
 def main():
     sim_cfg = load_abm_sim_cfg()
-    runner = ExperimentRunner(sim_cfg, BM_RESULTS_DIR)
+    runner = ExperimentRunner(sim_cfg, LUT_DIR)
 
     mode = sys.argv[1] if len(sys.argv) > 1 else 'single'
 

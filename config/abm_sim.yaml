@@ -7,7 +7,7 @@ experiment: "abm_simulation"
 # FILES
 # -----------------------------------------------------------------------------
 files:
-  recruitment_csv: "param_sweep_Joint_Recr_Sweep.csv"
+  recruitment_csv: "rho_recruitment.csv"
 
 # -----------------------------------------------------------------------------
 # SIMULATION — Time integration scheme and run length
@@ -16,7 +16,7 @@ files:
 # Units: lengths in µm, times in minutes, forces in nN.
 simulation:
   dt: 0.1
-  n_steps: 3000
+  n_steps: 6000
   viscousity: 3.0 # viscous drag coefficient (overdamped friction)
   max_displacement: 0.5 # per-step displacement clamp (numerical stability)
   detail_log_interval: 100
@@ -26,7 +26,7 @@ simulation:
 # -----------------------------------------------------------------------------
 cell:
   n_nodes: 20
-  radius: 12.0 # initial cell radius (µm)
+  radius: 35.0 # initial cell radius (µm)
   centroid: [0.0, 0.0] # initial centroid position
   polar_angle: 30 # half-cone angle (degrees) defining polar nodes
   p_area: 0.5 # area-conservation pressure coefficient

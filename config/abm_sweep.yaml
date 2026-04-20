@@ -3,7 +3,7 @@
 experiment: "abm_parameter_sweep"
 
 sweeps:
-  - name: "k_base_sweep"
+  - name: "k_base"
     perturbations: "all"
     type: "1D"
     parameters:

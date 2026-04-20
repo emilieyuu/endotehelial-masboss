@@ -1,6 +1,35 @@
 # src/utils/sweep_utils.py
 
 import itertools
+import copy
+
+
+def get_selected_specs(specs, target_names=None, target_type=None):
+    """
+    Filter sweep/spec list by optional names and/or type.
+    """
+    selected = specs
+
+    if target_names:
+        selected = [s for s in selected if s["name"] in target_names]
+    if target_type:
+        selected = [s for s in selected if s["type"] == target_type]
+
+    return selected
+
+def build_cartesian_product(param_values):
+    """
+    Build cartesian product from mapping of param -> values.
+
+    Returns list[dict].
+    """
+    keys = list(param_values.keys())
+    vals = list(param_values.values())
+    
+    return [
+        dict(zip(keys, combo))
+        for combo in itertools.product(*vals)
+    ]
 
 # Build parameter combinations from sweep config specs
 def build_param_combinations(param_specs):
@@ -32,24 +61,46 @@ def combo_to_row(combo):
     """
     return {".".join(path): value for path, value in combo.items()}
 
-# Filename of specific sweep experiment for storing
-def get_filename(model, target_sweeps, target_type):
+def get_filename(specs=None, target_type=None, prefix="param_sweep"):
     """
-    Build output filename for selected sweep set.
-
-    model: str – abm or bm
-    target_sweeps: int – number of sweeps
-    target_type: str – 1D or 2D
+    Shared filename helper for saved sweep outputs.
     """
-    n_sweeps = len(target_sweeps) if target_sweeps else 0
+    n_specs = len(specs) if specs else 0
 
-    if target_type and not target_sweeps:
-        filename = f"{model}_sweep_{target_type}"
-    elif target_sweeps and n_sweeps == 1:
-        filename = f"{model}_sweep_{target_sweeps[0]['name']}"
-    elif target_sweeps and n_sweeps > 1:
-        filename = f"{model}_sweep_{n_sweeps}_selected"
-    else:
-        filename = f"{model}_sweep_full"
+    if target_type and not specs:
+        return f"{prefix}_{target_type}"
+    if specs and n_specs == 1:
+        return f"{prefix}_{specs[0]['name']}"
+    if specs and n_specs > 1:
+        return f"{prefix}_{n_specs}_selected"
+    return f"{prefix}_full"
 
-    return filename
+def set_nested(cfg, path, value):
+    """
+    Set nested config value in-place.
+
+    path: list[str], e.g. ["mechanics", "k_base"]
+    value: new value to replace current in cofig
+    """
+    target = cfg
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+    return cfg
+
+
+def apply_param_combo(cfg_base, combo):
+    """
+    Return deep-copied config with one parameter combination applied.
+
+    combo: dict of {tuple(path): value}
+    Example:
+        {
+            ("mechanics", "k_base"): 2.0,
+            ("cortex", "a_drop"): 0.2,
+        }
+    """
+    cfg = copy.deepcopy(cfg_base)
+    for path, value in combo.items():
+        set_nested(cfg, list(path), value)
+    return cfg

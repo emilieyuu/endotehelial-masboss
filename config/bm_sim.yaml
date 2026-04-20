@@ -5,6 +5,8 @@ experiment: "bm_perturbation_simulation"
 
 # Path Configuration
 model:
+  bnd: "rho.bnd"
+  cfg: "rho.cfg"
   bnd_v1: "maboss_models/rho.bnd"
   bnd_v2: "maboss_models/rho_v2.bnd"
   cfg_v3: "maboss_models/rho_v3.cfg"
@@ -12,7 +14,7 @@ model:
 
 
 # Sim Settings
-sim_settings: 
+simulation: 
   max_time: 10.0
   sample_count: 5000
 

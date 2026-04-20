@@ -15,7 +15,11 @@ groups:
   rhos: ["RhoA", "RhoC"]
   junctions:  ["DSP", "TJP1", "JCAD"]
 
-experiments: 
+lut:
+    resolution: "coarse"
+    parameters: ["$DSP_recruitment", "$TJP1_recruitment", "$JCAD_recruitment"]
+    
+sweeps: 
   # --- 1D Sweeps ---
   - name: "wt_sweep"
     perturbations: ["WT"]
@@ -103,10 +107,5 @@ experiments:
     type: "2D"
     resolution: "coarse"
     parameters: ["$RhoA_basal", "$RhoC_basal"]
-  
-  # --- 3D Sweeps ---
-  - name: "recruitment_sweep"
-    perturbations: ["WT"]
-    type: "3D"
-    resolution: "coarse"
-    parameters: ["$DSP_recruitment", "$TJP1_recruitment", "$JCAD_recruitment"]
+
+
