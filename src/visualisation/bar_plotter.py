@@ -12,16 +12,15 @@ def plot_bar_metrics(
     """
     General bar plot for one or more metrics across categories.
 
-    df: pandas.DataFrame – input dataframe.
-    x_col: str – column containing category labels (e.g. 'perturbation' or 'Perturbation').
-    y_cols: str or list[str] – one or more numeric columns to plot.
-    outdir: str or Path – optional output directory for saving figure.
-    filename : output filename if outdir is provided.
-    order : list[str] – explicit category order.
-    colour_map : dict, optional mapping from category name -> colour
-    ref_category : str - category used for horizontal reference line.
-    ylabel : str – optional Y-axis label.
-    title : str, optional plot title.
+    df: DataFrame 
+    x_col: str – column containing category labels
+    y_cols: str or list[str] – one or more numeric columns to plot
+    outdir: optional output directory for saving figure
+    order: list[str] – explicit category order.
+    colour_map: dict — optional mapping from category name -> colour
+    ref_category: str - category used for horizontal reference line
+    ylabel: str – optional Y-axis label.
+    title: str — optional plot title.
     """
 
     if isinstance(y_cols, str):

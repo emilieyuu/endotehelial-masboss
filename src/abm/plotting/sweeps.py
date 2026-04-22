@@ -23,6 +23,21 @@ def plot_ar_k_sweep(df, outdir=None):
         outdir=outdir,
     )
 
+def plot_rho_k_sweep(df, outdir=None):
+    plot_sweep_lines(
+        df,
+        x_col="mechanics.k_base",
+        y_col="rho_balance",
+        group_col="perturbation",
+        order=None,
+        colour_map=PERTURBATION_COLOURS,
+        title="Rho Balance Across Stiffness Sweep",
+        x_label="base stiffness (k_base)",
+        y_label="RhoA-RhoC",
+        outdir=outdir,
+    )
+
+
 def plot_sf_squeeze_k_sweep(df, outdir=None):
     plot_sweep_lines(
         df,

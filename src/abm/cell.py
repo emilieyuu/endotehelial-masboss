@@ -101,7 +101,6 @@ class Cell:
         return StressFibreCable(
             node_up=self.nodes[up_id],
             node_down=self.nodes[dn_id],
-            nodes=self.nodes,
             rest_length=L_rest,
             cfg=cfg,
         )

@@ -6,11 +6,7 @@ import pandas as pd
 from src.boolean_model.runtime.model_loader import generate_ko_model
 from src.boolean_model.analysis.phenotypes import compute_delta, classify_phenotype
 from src.utils.file_utils import save_df_to_csv
-from src.utils.sweep_utils import (
-    build_cartesian_product,
-    get_selected_specs,
-    get_filename,
-)
+from src.utils.sweep_utils import build_cartesian_product, get_selected_specs, get_filename
 
 
 # ------------------------------------------------------------------
@@ -51,7 +47,12 @@ def build_param_values_for_spec(spec, sweep_cfg):
     Resolve the actual parameter values used by one sweep spec.
     """
     all_values = build_ranges(sweep_cfg, resolution=spec.get("resolution", "fine"))
-    return {p: all_values[p] for p in spec["parameters"]}
+    parameters = spec["parameters"]
+
+    if parameters == "all":
+        return all_values
+
+    return {p: all_values[p] for p in parameters}
 
 
 # ------------------------------------------------------------------
@@ -178,6 +179,6 @@ def run_sweeps(base_model, sweep_cfg, sim_cfg, target_sweeps=None, target_type=N
 
     if result_dir is not None:
         filename = get_filename(selected, target_type=target_type, prefix="param_sweep")
-        save_df_to_csv(full_df, result_dir, filename, timestamp=False)
+        save_df_to_csv(full_df, result_dir, filename, ts=False)
 
     return full_df

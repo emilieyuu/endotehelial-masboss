@@ -12,6 +12,7 @@ import sys
 from src.config_loader import load_abm_sim_cfg
 from src.paths import LUT_DIR, ABM_SIM_RES_DIR
 from src.abm.experiments.experiment_runner import ExperimentRunner
+from src.abm.plotting.cell_plotter import *
 
 def main():
     sim_cfg = load_abm_sim_cfg()
@@ -28,6 +29,7 @@ def main():
 
     if mode == 'all':
         result = runner.run_all(result_dir=ABM_SIM_RES_DIR)
+        plot_cells_grid(result)
 
         print(">>> INFO: Finished all perturbations.")
         return result

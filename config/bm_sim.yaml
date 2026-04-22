@@ -7,10 +7,6 @@ experiment: "bm_perturbation_simulation"
 model:
   bnd: "rho.bnd"
   cfg: "rho.cfg"
-  bnd_v1: "maboss_models/rho.bnd"
-  bnd_v2: "maboss_models/rho_v2.bnd"
-  cfg_v3: "maboss_models/rho_v3.cfg"
-  cfg_v4: "maboss_models/rho_v4.cfg"
 
 
 # Sim Settings
