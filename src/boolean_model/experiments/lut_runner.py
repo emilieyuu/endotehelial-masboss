@@ -1,11 +1,9 @@
-# boolean_models/experiments/lut_runner.py
+# src/boolean_model/experiments/lut_runner.py
 #
 # Thin wrapper for running the recruitment sweep used to build the ABM LUT.
-# boolean_models/experiments/lut_runner.py
 
 import pandas as pd
 
-from src.boolean_model.runtime.model_loader import generate_ko_model
 from src.boolean_model.experiments.parameter_sweep import build_ranges
 from src.utils.file_utils import save_df_to_csv
 from src.utils.sweep_utils import build_cartesian_product
