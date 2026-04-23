@@ -3,7 +3,7 @@
 import math
 from pathlib import Path
 import matplotlib.pyplot as plt
-from src.utils import save_figure
+from src.utils.file_utils import save_figure
 
 def plot_sweep_lines(
     df, x_col, y_col,  group_col="perturbation", outdir=None,

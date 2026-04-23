@@ -4,7 +4,7 @@ import math
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-from src.utils import save_figure
+from src.utils.file_utils import save_figure
 
 # ------------------------------------------------------------------
 # Single 
