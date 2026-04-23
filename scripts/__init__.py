@@ -1,1 +1,3 @@
-# scripts/__init__.py
+"""Script entrypoints for running project workflows."""
+
+__all__ = []

@@ -33,3 +33,7 @@ node RhoC {
               $RhoC_basal);
     rate_down = RhoA ? $RhoC_antagonistic : $RhoC_decay;
 }
+
+
+
+¢
