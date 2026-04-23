@@ -16,7 +16,7 @@ files:
 # Units: lengths in µm, times in minutes, forces in nN.
 simulation:
   dt: 0.1
-  n_steps: 300
+  n_steps: 3000
   viscousity: 3.0 # viscous drag coefficient (overdamped friction)
   max_displacement: 0.5 # per-step displacement clamp (numerical stability)
   detail_log_interval: 100
